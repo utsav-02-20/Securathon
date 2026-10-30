@@ -1,0 +1,31 @@
+{
+  "dataset_samples": 2650,
+  "total_anomalies": 650,
+  "total_normal": 2000,
+  "roc_auc_score": 0.9975,
+  "precision": 0.8025,
+  "recall": 1.0,
+  "f1_score": 0.8904,
+  "calibrated_threshold": 0.0095,
+  "confusion_matrix": {
+    "true_negatives": 1840,
+    "false_positives": 160,
+    "false_negatives": 0,
+    "true_positives": 650
+  },
+  "attack_breakdown": {
+    "bola_idor_detection_rate": 1.0,
+    "bola_samples_tested": 350,
+    "bola_detected": 350,
+    "fuzzing_detection_rate": 1.0,
+    "fuzzing_samples_tested": 150,
+    "fuzzing_detected": 150
+  },
+  "latency_benchmark": {
+    "avg_latency_ms": 4.0241,
+    "p95_latency_ms": 4.9685,
+    "p99_latency_ms": 6.0016,
+    "sla_target_ms": 15.0,
+    "sla_met": true
+  }
+}

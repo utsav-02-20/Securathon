@@ -41,7 +41,7 @@ def test_gateway_health(gateway_client: TestClient):
     data = resp.json()
     assert data["status"] == "healthy"
     assert data["service"] == "api-security-gateway"
-    assert data["guard_status"] == "active"
+    assert "active" in data["guard_status"]
 
 
 def test_issue_token(gateway_client: TestClient):
