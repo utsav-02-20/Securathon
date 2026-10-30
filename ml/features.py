@@ -120,10 +120,12 @@ def compute_features_from_history(
             numeric_ids.append(float(rid))
         except (ValueError, TypeError):
             if rid:
-                numeric_ids.append(float(abs(hash(rid)) % 10000))
+                digits = re.findall(r'\d+', str(rid))
+                if digits:
+                    numeric_ids.append(float(digits[-1]))
 
     if len(numeric_ids) >= 2:
-        jump_delta = abs(numeric_ids[-1] - numeric_ids[-2])
+        jump_delta = min(200.0, float(abs(numeric_ids[-1] - numeric_ids[-2])))
         deltas = [abs(numeric_ids[i] - numeric_ids[i-1]) for i in range(1, len(numeric_ids))]
         
         # A sequence requires at least 2 transitions (3+ requests) to establish variance

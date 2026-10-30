@@ -22,9 +22,9 @@
     "fuzzing_detected": 150
   },
   "latency_benchmark": {
-    "avg_latency_ms": 4.0157,
-    "p95_latency_ms": 4.9198,
-    "p99_latency_ms": 5.9167,
+    "avg_latency_ms": 3.9996,
+    "p95_latency_ms": 5.0155,
+    "p99_latency_ms": 7.0012,
     "sla_target_ms": 15.0,
     "sla_met": true
   }
