@@ -10,6 +10,7 @@ from core.security import (
     MissingTokenException
 )
 from core.rate_limiter import rate_limiter, RateLimitResult
+from core.event_stream import event_broadcaster
 from core.logger import setup_logger
 
 logger = setup_logger("gateway.dependencies")
@@ -21,6 +22,7 @@ async def get_authenticated_claims(request: Request) -> Dict[str, Any]:
     Extracts Bearer token, validates signature, ensures algorithm integrity,
     checks Redis blacklist, and returns claims.
     """
+    client_ip = request.client.host if request.client else "127.0.0.1"
     auth_header = request.headers.get("Authorization")
     if not auth_header:
         raise HTTPException(
@@ -49,6 +51,19 @@ async def get_authenticated_claims(request: Request) -> Dict[str, Any]:
         claims = await verify_jwt_token(token)
         return claims
     except AlgNoneExploitException as exc:
+        # Broadcast live exploit event to SOC dashboard
+        event = event_broadcaster.create_event(
+            event_type="ALG_NONE_EXPLOIT",
+            user_id="anonymous_attacker",
+            client_ip=client_ip,
+            endpoint=request.url.path,
+            http_method=request.method,
+            risk_score=1.0,
+            action="BLOCKED",
+            threat_indicators=["SIGNATURE_EVASION_ATTACK"]
+        )
+        await event_broadcaster.broadcast(event)
+
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
@@ -67,6 +82,19 @@ async def get_authenticated_claims(request: Request) -> Dict[str, Any]:
             headers={"WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"The token has expired\""}
         )
     except TokenRevokedException as exc:
+        # Broadcast revoked token usage event to SOC dashboard
+        event = event_broadcaster.create_event(
+            event_type="TOKEN_REVOKED",
+            user_id="revoked_identity",
+            client_ip=client_ip,
+            endpoint=request.url.path,
+            http_method=request.method,
+            risk_score=0.95,
+            action="BLOCKED",
+            threat_indicators=["BLACK_LISTED_JTI_REJECTION"]
+        )
+        await event_broadcaster.broadcast(event)
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
@@ -108,6 +136,7 @@ async def enforce_sliding_window_rate_limit(
     claims = await get_authenticated_claims(request)
     user_id = str(claims.get("sub", "unknown_user"))
     role = str(claims.get("role", "customer")).lower()
+    client_ip = request.client.host if request.client else "127.0.0.1"
 
     # Determine role-based quota
     if role == "admin":
@@ -125,11 +154,24 @@ async def enforce_sliding_window_rate_limit(
         scope="user"
     )
 
-    # Attach to request state for response header enrichment
     request.state.rate_limit_result = result
 
     if not result.allowed:
         logger.warning(f"Volumetric spike blocked: User '{user_id}' exceeded limit of {limit} req/{settings.rate_limit_window_seconds}s")
+        
+        # Broadcast Rate Limit Drop event to SOC dashboard
+        event = event_broadcaster.create_event(
+            event_type="RATE_LIMIT_DROP",
+            user_id=user_id,
+            client_ip=client_ip,
+            endpoint=request.url.path,
+            http_method=request.method,
+            risk_score=0.85,
+            action="BLOCKED",
+            threat_indicators=["VOLUMETRIC_SPIKE_EXCEEDED"]
+        )
+        await event_broadcaster.broadcast(event)
+
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail={

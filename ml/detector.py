@@ -118,7 +118,7 @@ class BehavioralAnomalyDetector:
             threat_indicators.append("HIGH_RESOURCE_TRAVERSAL")
             normalized_risk = max(normalized_risk, 0.82)
 
-        if features.request_velocity > 12.0:
+        if features.request_velocity > 12.0 and features.unique_id_ratio > 0.6:
             threat_indicators.append("BURST_VELOCITY")
             normalized_risk = max(normalized_risk, 0.80)
 
