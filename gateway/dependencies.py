@@ -1,5 +1,6 @@
 from typing import Dict, Any, Optional
 from fastapi import Request, HTTPException, status
+from core.config import settings
 from core.security import (
     verify_jwt_token,
     AlgNoneExploitException,
@@ -8,14 +9,15 @@ from core.security import (
     InvalidTokenException,
     MissingTokenException
 )
+from core.rate_limiter import rate_limiter, RateLimitResult
 from core.logger import setup_logger
 
-logger = setup_logger("gateway.auth")
+logger = setup_logger("gateway.dependencies")
 
 
 async def get_authenticated_claims(request: Request) -> Dict[str, Any]:
     """
-    FastAPI dependency: Deterministic Cryptographic Identity Guard.
+    STEP 2: Deterministic Cryptographic Identity Guard.
     Extracts Bearer token, validates signature, ensures algorithm integrity,
     checks Redis blacklist, and returns claims.
     """
@@ -92,3 +94,52 @@ async def get_authenticated_claims(request: Request) -> Dict[str, Any]:
             }
         )
 
+
+async def enforce_sliding_window_rate_limit(
+    request: Request
+) -> Dict[str, Any]:
+    """
+    STEP 2 & STEP 3 Combined Pipeline:
+    1. Authenticates identity claims (Step 2).
+    2. Evaluates atomic Redis sliding-window limit for the authenticated user (Step 3).
+    3. Rejects volumetric bursts / flood attacks in <1ms with HTTP 429 and RFC headers.
+    4. Attaches rate limit telemetry to request.state for downstream proxy header injection.
+    """
+    claims = await get_authenticated_claims(request)
+    user_id = str(claims.get("sub", "unknown_user"))
+    role = str(claims.get("role", "customer")).lower()
+
+    # Determine role-based quota
+    if role == "admin":
+        limit = settings.rate_limit_admin
+    elif role == "merchant":
+        limit = settings.rate_limit_merchant
+    else:
+        limit = settings.rate_limit_customer
+
+    # Check sliding window rate limit atomically in Redis
+    result: RateLimitResult = await rate_limiter.is_allowed(
+        identifier=user_id,
+        limit=limit,
+        window_seconds=settings.rate_limit_window_seconds,
+        scope="user"
+    )
+
+    # Attach to request state for response header enrichment
+    request.state.rate_limit_result = result
+
+    if not result.allowed:
+        logger.warning(f"Volumetric spike blocked: User '{user_id}' exceeded limit of {limit} req/{settings.rate_limit_window_seconds}s")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "error": "RATE_LIMIT_EXCEEDED",
+                "message": f"Too many requests. Limit of {limit} requests per {settings.rate_limit_window_seconds}s exceeded.",
+                "limit": limit,
+                "window_seconds": settings.rate_limit_window_seconds,
+                "retry_after": result.retry_after
+            },
+            headers=result.headers
+        )
+
+    return claims

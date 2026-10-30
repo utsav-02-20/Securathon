@@ -48,9 +48,13 @@ class Settings(BaseSettings):
         alias="DATABASE_URL"
     )
 
-    # Rate Limiting Configuration
+    # Rate Limiting Configuration (Atomic Sliding Window)
     rate_limit_requests_per_window: int = Field(default=100, alias="RATE_LIMIT_REQUESTS_PER_WINDOW")
     rate_limit_window_seconds: int = Field(default=60, alias="RATE_LIMIT_WINDOW_SECONDS")
+    rate_limit_customer: int = Field(default=100, alias="RATE_LIMIT_CUSTOMER")
+    rate_limit_merchant: int = Field(default=250, alias="RATE_LIMIT_MERCHANT")
+    rate_limit_admin: int = Field(default=1000, alias="RATE_LIMIT_ADMIN")
+    rate_limit_unauth_ip: int = Field(default=30, alias="RATE_LIMIT_UNAUTH_IP")
 
     # Behavioral ML & Telemetry
     anomaly_score_threshold: float = Field(default=0.75, alias="ANOMALY_SCORE_THRESHOLD")
