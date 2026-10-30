@@ -1,4 +1,5 @@
 import uuid
+import time
 from contextlib import asynccontextmanager
 from typing import Dict, Any, Optional
 from datetime import timedelta
@@ -12,7 +13,8 @@ from core.config import settings
 from core.logger import setup_logger
 from core.redis_client import get_redis_client, close_redis_client, blacklist_token
 from core.security import create_access_token, verify_jwt_token, revoke_token_by_payload
-from gateway.dependencies import get_authenticated_claims
+from core.rate_limiter import rate_limiter, RateLimitResult
+from gateway.dependencies import get_authenticated_claims, enforce_sliding_window_rate_limit
 from gateway.proxy import get_proxy_client, close_proxy_client, forward_request
 
 logger = setup_logger("gateway.main")
@@ -57,7 +59,7 @@ app.add_middleware(
 
 
 # ------------------------------------------------------------------------------
-# Auth Schemas
+# Auth & System Schemas
 # ------------------------------------------------------------------------------
 class TokenRequest(BaseModel):
     user_id: str = Field(default="user_101", description="Subject / User identifier")
@@ -95,7 +97,9 @@ async def gateway_health():
         "service": "api-security-gateway",
         "port": settings.gateway_port,
         "backend_target": settings.backend_service_url,
-        "guard_status": "active"
+        "guard_status": "active",
+        "rate_limiter_status": "active (sliding-window)",
+        "rate_limit_window": f"{settings.rate_limit_window_seconds}s"
     }
 
 
@@ -188,8 +192,41 @@ async def get_demo_tokens():
     return tokens
 
 
+@app.get("/auth/rate-limit-status", tags=["Rate Limiting"])
+async def get_current_rate_limit(
+    request: Request,
+    claims: Dict[str, Any] = Depends(get_authenticated_claims)
+):
+    """
+    Inspects current sliding window rate limit status for the authenticated user without consuming quota.
+    """
+    user_id = claims["sub"]
+    role = claims.get("role", "customer").lower()
+    limit = settings.rate_limit_admin if role == "admin" else (settings.rate_limit_merchant if role == "merchant" else settings.rate_limit_customer)
+    
+    # Query without adding a new point (using 0 limit mock check or inspect)
+    r = await get_redis_client()
+    key = f"ratelimit:user:{user_id}"
+    now = time.time()
+    pipe = r.pipeline(transaction=True)
+    pipe.zremrangebyscore(key, "-inf", now - settings.rate_limit_window_seconds)
+    pipe.zcard(key)
+    results = await pipe.execute()
+    current_count = int(results[1])
+    remaining = max(0, limit - current_count)
+
+    return {
+        "user_id": user_id,
+        "role": role,
+        "limit": limit,
+        "current_count": current_count,
+        "remaining": remaining,
+        "window_seconds": settings.rate_limit_window_seconds
+    }
+
+
 # ------------------------------------------------------------------------------
-# Core Reverse Proxy Route with Guard Pipeline
+# Core Reverse Proxy Route with Guard + Rate Limiting Pipeline
 # ------------------------------------------------------------------------------
 @app.api_route(
     "/api/{path:path}",
@@ -199,20 +236,22 @@ async def get_demo_tokens():
 async def proxy_protected_api(
     path: str,
     request: Request,
-    claims: Dict[str, Any] = Depends(get_authenticated_claims)
+    claims: Dict[str, Any] = Depends(enforce_sliding_window_rate_limit)
 ):
     """
-    STEP 1 & STEP 2 of Gateway Request Lifecycle:
-    1. Intercepts incoming request.
+    STEP 1, 2 & 3 of Gateway Request Lifecycle:
+    1. Intercepts incoming client request.
     2. Validates cryptographic JWT identity (The Guard).
-    3. Injects enriched identity context headers:
+    3. Evaluates atomic Redis sliding-window rate limit (Drops bursts in <1ms with 429).
+    4. Injects enriched identity context headers:
        - X-User-ID: Authenticated subject
        - X-User-Role: RBAC role
        - X-Tenant-ID: Organization / Tenant
        - X-Request-ID: Unique tracing UUID
        - X-Forwarded-For: Client IP
        - X-Gateway-Guard: Status flag ('passed')
-    4. Forwards seamlessly to downstream microservice (:8001).
+    5. Forwards seamlessly to downstream microservice (:8001).
+    6. Appends RFC Rate-Limiting response headers (X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset).
     """
     request_id = str(uuid.uuid4())
     client_ip = request.client.host if request.client else "127.0.0.1"
@@ -233,7 +272,15 @@ async def proxy_protected_api(
         f"User: {claims.get('sub')} | ReqID: {request_id}"
     )
 
-    return await forward_request(request, downstream_url, injected_headers)
+    downstream_response = await forward_request(request, downstream_url, injected_headers)
+
+    # Attach RFC rate-limit headers from Step 3 to downstream response
+    rate_limit_result: Optional[RateLimitResult] = getattr(request.state, "rate_limit_result", None)
+    if rate_limit_result:
+        for header_name, header_value in rate_limit_result.headers.items():
+            downstream_response.headers[header_name] = header_value
+
+    return downstream_response
 
 
 def start():
@@ -250,4 +297,3 @@ def start():
 
 if __name__ == "__main__":
     start()
-
