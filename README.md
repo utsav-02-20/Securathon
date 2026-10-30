@@ -88,17 +88,17 @@ Securathon/
 
 ---
 
-## 🚀 Phase 1 Deliverables (Completed)
+## 🚀 Phase Status & Deliverables
 
-| Component | Status | Details |
-|---|---|---|
-| **Folder Architecture** | ✅ Done | Clean separation of concerns (`core/`, `gateway/`, `mock_backend/`, `ml/`, `db/`, `dashboard/`, `tests/`) |
-| **Container Infrastructure** | ✅ Done | `docker-compose.yml` for Redis 7 (sliding window/blacklist) & PostgreSQL 16 (incident store) |
-| **Configuration & Environment** | ✅ Done | `core/config.py` with typed Pydantic settings loading from `.env` |
-| **Mock Backend Microservice** | ✅ Done | FastAPI application on port 8001 with sample protected endpoints (`/orders/{id}`, `/users/{id}`, `/transactions`) |
-| **Multi-Tenant Seed Database** | ✅ Done | Rich pre-populated dataset spanning multiple tenants to simulate BOLA/IDOR vulnerability |
-| **Gateway Context Header Echo** | ✅ Done | Backend inspects and returns `X-User-ID`, `X-User-Role`, and `X-Gateway-Risk-Score` injected by the gateway |
-| **Pytest Test Suite** | ✅ Done | 9 automated unit tests verifying mock backend endpoints and context parsing (100% pass) |
+| Phase | Milestone | Status | Key Deliverables |
+|---|---|---|---|
+| **Phase 1** | Project Architecture, Infrastructure & Mock Backend | ✅ Complete | Directory structure, `docker-compose.yml` (Redis + Postgres), `.env`, `mock_backend/` (:8001), 9 unit tests passing. |
+| **Phase 2** | FastAPI Reverse Proxy & Cryptographic JWT Engine | ✅ Complete | High-concurrency `httpx` proxy (:8000), deterministic JWT Guard (HS256), `alg: none` exploit hard-block (403), Redis JTI Blacklist revocation ($O(1) <0.2\text{ms}$), 11 unit tests passing (20/20 total). |
+| **Phase 3** | Atomic Redis Sliding-Window Rate Limiter | ⏳ Next | Rolling 60s sliding window, Redis Sorted Sets / Lua script, volumetric flood drop (HTTP 429 in <1ms). |
+| **Phase 4** | Telemetry Extraction & Isolation Forest AI Engine | ⏳ Pending | Behavioral feature extraction (velocity, Shannon entropy, ID jump variance), lightweight Isolation Forest scoring. |
+| **Phase 5** | Risk Mitigation Pipeline & PostgreSQL Audit Store | ⏳ Pending | Policy engine (Allow, Block 403, Tarpit delay), non-blocking `asyncpg` persistence. |
+| **Phase 6** | Real-time Event Streaming & Security SOC Dashboard | ⏳ Pending | Redis Pub/Sub broadcast, WebSocket threat stream, live interactive SOC Dashboard UI. |
+| **Phase 7** | Attack Simulation Suite & Performance Benchmarking | ⏳ Pending | Automated attack runner (`simulate_attacks.py`), Locust/k6 latency validation (<15ms). |
 
 ---
 
