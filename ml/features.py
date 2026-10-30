@@ -125,12 +125,16 @@ def compute_features_from_history(
     if len(numeric_ids) >= 2:
         jump_delta = abs(numeric_ids[-1] - numeric_ids[-2])
         deltas = [abs(numeric_ids[i] - numeric_ids[i-1]) for i in range(1, len(numeric_ids))]
-        jump_variance = calculate_variance(deltas)
-        # Sequentiality is significant ONLY when jumping across different IDs (delta >= 1.0)
-        # and unique ratio is high. If delta == 0, user is staying on same resource (normal browsing)
-        if jump_delta >= 1.0 and unique_ratio >= 0.6:
-            sequentiality = 1.0 / (1.0 + jump_variance)
+        
+        # A sequence requires at least 2 transitions (3+ requests) to establish variance
+        if len(deltas) >= 2:
+            jump_variance = calculate_variance(deltas)
+            if jump_delta >= 1.0 and unique_ratio >= 0.6:
+                sequentiality = 1.0 / (1.0 + jump_variance)
+            else:
+                sequentiality = 0.02
         else:
+            jump_variance = 25.0
             sequentiality = 0.02
     else:
         jump_delta = 0.0

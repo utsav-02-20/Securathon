@@ -95,9 +95,9 @@ Securathon/
 | **Phase 1** | Project Architecture, Infrastructure & Mock Backend | ✅ Complete | Directory structure, `docker-compose.yml` (Redis + Postgres), `.env`, `mock_backend/` (:8001), 9 unit tests passing. |
 | **Phase 2** | FastAPI Reverse Proxy & Cryptographic JWT Engine | ✅ Complete | High-concurrency `httpx` proxy (:8000), deterministic JWT Guard (HS256), `alg: none` exploit hard-block (403), Redis JTI Blacklist revocation ($O(1) <0.2\text{ms}$), 11 unit tests passing. |
 | **Phase 3** | Atomic Redis Sliding-Window Rate Limiter | ✅ Complete | Rolling 60s sliding window via Redis Sorted Sets (ZSET) transaction pipeline, role-based tiers (Customer/Merchant/Admin), sub-millisecond flood drop (HTTP 429), standard RFC headers (`Retry-After`, `X-RateLimit-*`), 6 unit tests passing. |
-| **Phase 4** | Telemetry Extraction & Isolation Forest AI Engine | ✅ Complete | Behavioral telemetry extraction (velocity, Shannon entropy, sequential ID jump variance), persistent dataset (`data/telemetry_dataset.csv`, 2650 samples), lightweight `IsolationForest` ($<1\text{ms}$ inference), risk scoring ($0.0-1.0$), 6 unit tests passing (32/32 total). |
-| **Phase 5** | Risk Mitigation Pipeline & PostgreSQL Audit Store | ⏳ Next | Policy engine (Allow, Block 403, Tarpit delay), non-blocking `asyncpg` persistence. |
-| **Phase 6** | Real-time Event Streaming & Security SOC Dashboard | ⏳ Pending | Redis Pub/Sub broadcast, WebSocket threat stream, live interactive SOC Dashboard UI. |
+| **Phase 4** | Telemetry Extraction & Isolation Forest AI Engine | ✅ Complete | Behavioral telemetry extraction (velocity, Shannon entropy, sequential ID jump variance), persistent dataset (`data/telemetry_dataset.csv`, 2650 samples), lightweight `IsolationForest` ($<1\text{ms}$ inference), quantitative benchmark (ROC-AUC 0.9975, 100% BOLA recall), 7 unit tests passing. |
+| **Phase 5** | Risk Mitigation Pipeline & PostgreSQL Audit Store | ✅ Complete | Policy engine (Allow, Tarpit latency injection, Block 403, Auto-JTI revocation in Redis), non-blocking async audit logger (`db/`), tables (`security_incidents`, `blocked_entities`, `telemetry_logs`), audit query endpoints, 5 unit tests passing (38/38 total). |
+| **Phase 6** | Real-time Event Streaming & Security SOC Dashboard | ⏳ Next | Redis Pub/Sub broadcast, WebSocket threat stream, live interactive SOC Dashboard UI. |
 | **Phase 7** | Attack Simulation Suite & Performance Benchmarking | ⏳ Pending | Automated attack runner (`simulate_attacks.py`), Locust/k6 latency validation (<15ms). |
 
 ---
