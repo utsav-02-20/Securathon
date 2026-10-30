@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Securathon | SOC Threat Observability Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #070b14;
+      --card-bg: #0f172a;
+      --border: #1e293b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --cyan: #00f2fe;
+      --red: #ff3366;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --purple: #8b5cf6;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #00f2fe, #4facfe);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .badge-live {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--green);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .pulse {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse-animation 1.5s infinite;
+    }
+
+    @keyframes pulse-animation {
+      0% { opacity: 0.4; }
+      50% { opacity: 1; }
+      100% { opacity: 0.4; }
+    }
+
+    /* Metric Cards */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    }
+
+    .card-title {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .card-value {
+      font-size: 2rem;
+      font-weight: 700;
+    }
+
+    /* Main Dashboard Layout */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .main-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Feed Container */
+    .feed-container {
+      display: flex;
+      flex-direction: column;
+      height: 600px;
+    }
+
+    .feed-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .table-wrapper {
+      flex: 1;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      background: #1e293b;
+      padding: 12px;
+      text-align: left;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    td {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    tr:hover { background: rgba(255, 255, 255, 0.02); }
+
+    .pill {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+
+    .pill-blocked { background: rgba(255, 51, 102, 0.2); color: var(--red); border: 1px solid rgba(255, 51, 102, 0.4); }
+    .pill-allow { background: rgba(16, 185, 129, 0.2); color: var(--green); border: 1px solid rgba(16, 185, 129, 0.4); }
+    .pill-tarpit { background: rgba(245, 158, 11, 0.2); color: var(--amber); border: 1px solid rgba(245, 158, 11, 0.4); }
+
+    /* Controls & Simulator */
+    .simulator-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .sim-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: #1e293b;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.85rem;
+      transition: all 0.2s ease;
+    }
+
+    .sim-btn:hover {
+      background: #334155;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .sim-btn.danger { border-color: rgba(255, 51, 102, 0.4); }
+    .sim-btn.danger:hover { background: rgba(255, 51, 102, 0.2); }
+
+    /* Risk Score Gauge Bar */
+    .risk-bar-container {
+      width: 70px;
+      height: 6px;
+      background: #334155;
+      border-radius: 3px;
+      overflow: hidden;
+      display: inline-block;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+
+    .risk-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+    }
+
+    .chart-box {
+      height: 220px;
+      position: relative;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header>
+    <div class="brand">
+      <h1>🛡️ SECURATHON SOC</h1>
+      <span class="badge badge-live">
+        <span class="pulse" id="ws-pulse"></span>
+        <span id="ws-status">Connecting to Gateway...</span>
+      </span>
+    </div>
+    <div style="font-size: 0.85rem; color: var(--text-muted);" id="clock">--:--:-- UTC</div>
+  </header>
+
+  <!-- Metric KPI Cards -->
+  <div class="metrics-grid">
+    <div class="card">
+      <div class="card-title">Total Requests Screened</div>
+      <div class="card-value" id="kpi-screened" style="color: var(--cyan);">0</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Threats Intercepted</div>
+      <div class="card-value" id="kpi-blocked" style="color: var(--red);">0</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Anomaly Rate</div>
+      <div class="card-value" id="kpi-rate" style="color: var(--amber);">0.0%</div>
+    </div>
+    <div class="card">
+      <div class="card-title">AI Scoring Latency</div>
+      <div class="card-value" id="kpi-latency" style="color: var(--green);">< 5ms</div>
+    </div>
+  </div>
+
+  <!-- Main Layout -->
+  <div class="main-grid">
+
+    <!-- Left: Real-Time Incident Feed -->
+    <div class="card feed-container">
+      <div class="feed-header">
+        <h3>Live Intercepted Threat Feed</h3>
+        <button onclick="clearFeed()" style="background: none; border: 1px solid var(--border); color: var(--text-muted); padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 0.75rem;">Clear Feed</button>
+      </div>
+      <div class="table-wrapper">
+        <table id="threat-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Threat Classification</th>
+              <th>Identity</th>
+              <th>Target Endpoint</th>
+              <th>Risk Score</th>
+              <th>Mitigation</th>
+            </tr>
+          </thead>
+          <tbody id="feed-tbody">
+            <!-- Dynamic rows prepended here -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Right: Charts & Threat Simulation Trigger Panel -->
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+      
+      <!-- Chart -->
+      <div class="card">
+        <div class="card-title">Threat Category Distribution</div>
+        <div class="chart-box">
+          <canvas id="threatChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Simulation Control Panel -->
+      <div class="card">
+        <div class="card-title">⚡ Interactive Attack Simulator</div>
+        <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 12px;">Trigger live synthetic attack vectors against the gateway pipeline to witness real-time AI interception:</p>
+        
+        <div class="simulator-panel">
+          <button class="sim-btn" onclick="simulateAttack('normal')">
+            <span>🟢 Normal User Browsing (Alice)</span>
+            <span style="font-size: 0.7rem; color: var(--green);">Allow 200</span>
+          </button>
+
+          <button class="sim-btn danger" onclick="simulateAttack('alg_none')">
+            <span>🔴 Forged JWT (alg: none)</span>
+            <span style="font-size: 0.7rem; color: var(--red);">Guard 403</span>
+          </button>
+
+          <button class="sim-btn danger" onclick="simulateAttack('rate_limit')">
+            <span>🟡 Rate Limit Spike (Burst DDoS)</span>
+            <span style="font-size: 0.7rem; color: var(--amber);">Drop 429</span>
+          </button>
+
+          <button class="sim-btn danger" onclick="simulateAttack('bola')">
+            <span>🟣 Stealthy BOLA Scraper (Eve IDOR)</span>
+            <span style="font-size: 0.7rem; color: var(--red);">AI Detective 403</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // System Clock
+    setInterval(() => {
+      document.getElementById('clock').innerText = new Date().toUTCString().slice(17, 25) + ' UTC';
+    }, 1000);
+
+    let screenedCount = 0;
+    let blockedCount = 0;
+    const threatCounts = {
+      "BOLA_IDOR_ATTACK": 0,
+      "RATE_LIMIT_DROP": 0,
+      "ALG_NONE_EXPLOIT": 0,
+      "TOKEN_REVOKED": 0,
+      "BENIGN": 0
+    };
+
+    // Chart.js Setup
+    const ctx = document.getElementById('threatChart').getContext('2d');
+    const threatChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['BOLA / IDOR', 'Rate Limit', 'alg: none Tamper', 'Normal Traffic'],
+        datasets: [{
+          data: [0, 0, 0, 1],
+          backgroundColor: ['#ff3366', '#f59e0b', '#8b5cf6', '#10b981'],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 } } }
+        }
+      }
+    });
+
+    // Update KPI counters
+    function updateKPIs() {
+      document.getElementById('kpi-screened').innerText = screenedCount;
+      document.getElementById('kpi-blocked').innerText = blockedCount;
+      const rate = screenedCount > 0 ? ((blockedCount / screenedCount) * 100).toFixed(1) : '0.0';
+      document.getElementById('kpi-rate').innerText = rate + '%';
+      
+      threatChart.data.datasets[0].data = [
+        threatCounts["BOLA_IDOR_ATTACK"],
+        threatCounts["RATE_LIMIT_DROP"],
+        threatCounts["ALG_NONE_EXPLOIT"],
+        threatCounts["BENIGN"]
+      ];
+      threatChart.update();
+    }
+
+    // Add Threat Event Row to Feed
+    function addThreatRow(event) {
+      screenedCount++;
+      if (event.action === "BLOCKED") blockedCount++;
+      
+      const typeKey = threatCounts.hasOwnProperty(event.event_type) ? event.event_type : (event.action === "BLOCKED" ? "BOLA_IDOR_ATTACK" : "BENIGN");
+      threatCounts[typeKey]++;
+      updateKPIs();
+
+      const tbody = document.getElementById('feed-tbody');
+      const row = document.createElement('tr');
+
+      const actionPill = event.action === 'BLOCKED'
+        ? '<span class="pill pill-blocked">BLOCKED 403</span>'
+        : (event.action === 'TARPIT' ? '<span class="pill pill-tarpit">TARPIT DELAY</span>' : '<span class="pill pill-allow">ALLOW 200</span>');
+
+      const scoreColor = event.risk_score >= 0.75 ? 'var(--red)' : (event.risk_score >= 0.50 ? 'var(--amber)' : 'var(--green)');
+      const scoreBarWidth = Math.min(100, Math.round(event.risk_score * 100));
+
+      const timeStr = event.timestamp ? event.timestamp.slice(11, 19) : new Date().toISOString().slice(11, 19);
+
+      row.innerHTML = `
+        <td style="color: var(--text-muted); font-size: 0.75rem;">${timeStr}</td>
+        <td style="font-weight: 600; color: ${event.action === 'BLOCKED' ? 'var(--red)' : 'var(--text)'};">${event.event_type}</td>
+        <td><code>${event.user_id}</code></td>
+        <td><code>${event.endpoint}</code></td>
+        <td>
+          <span style="font-weight: 700; color: ${scoreColor};">${event.risk_score}</span>
+          <div class="risk-bar-container">
+            <div class="risk-bar-fill" style="width: ${scoreBarWidth}%; background: ${scoreColor};"></div>
+          </div>
+        </td>
+        <td>${actionPill}</td>
+      `;
+
+      tbody.insertBefore(row, tbody.firstChild);
+
+      // Keep maximum 50 rows in view
+      if (tbody.children.length > 50) {
+        tbody.removeChild(tbody.lastChild);
+      }
+    }
+
+    function clearFeed() {
+      document.getElementById('feed-tbody').innerHTML = '';
+    }
+
+    // WebSocket Connection
+    let ws;
+    function connectWS() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws/security-stream`;
+      
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        document.getElementById('ws-status').innerText = 'LIVE (CONNECTED)';
+        document.getElementById('ws-status').style.color = 'var(--green)';
+        document.getElementById('ws-pulse').style.background = 'var(--green)';
+      };
+
+      ws.onmessage = (msg) => {
+        try {
+          const data = JSON.parse(msg.data);
+          if (data.type === 'HANDSHAKE') {
+            console.log('WS Handshake:', data);
+          } else {
+            addThreatRow(data);
+          }
+        } catch (e) {
+          console.error('Error parsing WS message:', e);
+        }
+      };
+
+      ws.onclose = () => {
+        document.getElementById('ws-status').innerText = 'OFFLINE (RECONNECTING...)';
+        document.getElementById('ws-status').style.color = 'var(--red)';
+        document.getElementById('ws-pulse').style.background = 'var(--red)';
+        setTimeout(connectWS, 3000);
+      };
+    }
+
+    connectWS();
+
+    // Simulation Trigger
+    async function simulateAttack(type) {
+      try {
+        if (type === 'normal') {
+          const tokenRes = await fetch('/auth/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: 'alice_normal', role: 'customer' })
+          });
+          const { access_token } = await tokenRes.json();
+          await fetch('/api/v1/orders/1001', {
+            headers: { 'Authorization': `Bearer ${access_token}` }
+          });
+        }
+        else if (type === 'alg_none') {
+          // Send unverified token with alg: none
+          const noneToken = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJhdHRhY2tlcl9ub25lIiwicm9sZSI6ImFkbWluIn0.";
+          await fetch('/api/v1/orders/1001', {
+            headers: { 'Authorization': `Bearer ${noneToken}` }
+          });
+        }
+        else if (type === 'rate_limit') {
+          const tokenRes = await fetch('/auth/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: 'ddos_spammer', role: 'customer' })
+          });
+          const { access_token } = await tokenRes.json();
+          // Blast 15 requests in parallel to trigger rate limit drop
+          for (let i = 0; i < 15; i++) {
+            fetch('/api/v1/orders/1001', {
+              headers: { 'Authorization': `Bearer ${access_token}` }
+            });
+          }
+        }
+        else if (type === 'bola') {
+          const tokenRes = await fetch('/auth/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: 'eve_bola_scraper', role: 'customer' })
+          });
+          const { access_token } = await tokenRes.json();
+          // Loop sequential order IDs
+          for (let id = 1001; id <= 1004; id++) {
+            await fetch(`/api/v1/orders/${id}`, {
+              headers: { 'Authorization': `Bearer ${access_token}` }
+            });
+            await new Promise(r => setTimeout(r, 100));
+          }
+        }
+      } catch (err) {
+        console.error('Simulation error:', err);
+      }
+    }
+  </script>
+</body>
+</html>
+

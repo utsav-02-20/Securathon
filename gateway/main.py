@@ -1,3 +1,4 @@
+import os
 import uuid
 import time
 import asyncio
@@ -6,8 +7,8 @@ from typing import Dict, Any, Optional, List
 from datetime import timedelta
 
 import uvicorn
-from fastapi import FastAPI, Request, Response, Depends, HTTPException, status
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Request, Response, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -16,6 +17,7 @@ from core.logger import setup_logger
 from core.redis_client import get_redis_client, close_redis_client, blacklist_token
 from core.security import create_access_token, verify_jwt_token, revoke_token_by_payload
 from core.rate_limiter import rate_limiter, RateLimitResult
+from core.event_stream import event_broadcaster, ThreatEvent
 from ml.detector import anomaly_detector, AnomalyDetectionResult
 from gateway.mitigation import mitigation_engine, MitigationDecision
 from db.session import init_db, close_db
@@ -24,6 +26,8 @@ from gateway.dependencies import get_authenticated_claims, enforce_sliding_windo
 from gateway.proxy import get_proxy_client, close_proxy_client, forward_request
 
 logger = setup_logger("gateway.main")
+
+DASHBOARD_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "dashboard", "index.html")
 
 
 @asynccontextmanager
@@ -95,7 +99,7 @@ class RevokeRequest(BaseModel):
 
 
 # ------------------------------------------------------------------------------
-# Public System & Auth Endpoints
+# Public System, Dashboard & Auth Endpoints
 # ------------------------------------------------------------------------------
 @app.get("/health", tags=["System"])
 async def gateway_health():
@@ -112,8 +116,40 @@ async def gateway_health():
         "ai_engine_status": "active (Isolation Forest sub-ms scoring)",
         "mitigation_pipeline": "active (Allow / Tarpit / Block / Auto-Revoke)",
         "audit_store": "active (PostgreSQL / asyncpg non-blocking)",
+        "soc_dashboard": "active (/dashboard, /ws/security-stream)",
         "anomaly_threshold": settings.anomaly_score_threshold
     }
+
+
+@app.get("/dashboard", response_class=HTMLResponse, tags=["Observability"])
+async def get_dashboard():
+    """
+    Serves the interactive real-time SOC Observability Dashboard.
+    """
+    if os.path.exists(DASHBOARD_FILE):
+        with open(DASHBOARD_FILE, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(content="<h1>SOC Dashboard file not found</h1>", status_code=404)
+
+
+@app.websocket("/ws/security-stream")
+async def websocket_security_stream(websocket: WebSocket):
+    """
+    WebSocket endpoint streaming live security incidents and telemetry
+    to connected SOC dashboards.
+    """
+    await event_broadcaster.connect(websocket)
+    try:
+        while True:
+            # Keep connection alive & receive heartbeat pings
+            data = await websocket.receive_text()
+            if data == "ping":
+                await websocket.send_text("pong")
+    except WebSocketDisconnect:
+        event_broadcaster.disconnect(websocket)
+    except Exception as e:
+        logger.warning(f"WebSocket client error: {e}")
+        event_broadcaster.disconnect(websocket)
 
 
 @app.post("/auth/token", response_model=TokenResponse, tags=["Authentication"])
@@ -261,7 +297,7 @@ async def get_security_summary():
 
 
 # ------------------------------------------------------------------------------
-# Complete Request Lifecycle: Steps 1 through 5
+# Complete Request Lifecycle: Steps 1 through 5 with Live Event Broadcasting
 # ------------------------------------------------------------------------------
 @app.api_route(
     "/api/{path:path}",
@@ -274,15 +310,15 @@ async def proxy_protected_api(
     claims: Dict[str, Any] = Depends(enforce_sliding_window_rate_limit)
 ):
     """
-    COMPLETE 5-STEP REQUEST PIPELINE:
+    COMPLETE 5-STEP REQUEST PIPELINE WITH LIVE EVENT STREAMING:
     Step 1: Ingestion by reverse proxy.
     Step 2: Cryptographic Identity & RBAC Check (The Guard) -> Drop 401/403.
     Step 3: Atomic Sliding Window Rate Limiter -> Drop 429 (<1ms).
     Step 4: Behavioral Telemetry Extraction & AI Scoring (Isolation Forest) -> Risk Score (0.0 to 1.0).
-    Step 5: Threat Mitigation & Forensic Persistence:
-            - Block (403): Malicious BOLA/IDOR attacks stopped before backend reach, JTI auto-revoked.
+    Step 5: Threat Mitigation, Forensic Persistence & Live SOC Event Streaming:
+            - Block (403): Malicious BOLA/IDOR attacks stopped, JTI auto-revoked, streamed to SOC.
             - Tarpit: Artificial delay injected to exhaust attacker sockets.
-            - Allow: Context injected, proxied to :8001, forensic telemetry logged asynchronously.
+            - Allow: Context injected, proxied to :8001, telemetry broadcasted to SOC.
     """
     t_start = time.perf_counter()
     user_id = str(claims.get("sub", "unknown_user"))
@@ -305,10 +341,11 @@ async def proxy_protected_api(
 
     # Step 5: Mitigation Policy Decision
     decision: MitigationDecision = mitigation_engine.decide(eval_result)
+    total_latency_ms = round((time.perf_counter() - t_start) * 1000, 2)
 
     # Check 1: Action is BLOCK (HTTP 403)
     if decision.action == "BLOCK":
-        # Log incident asynchronously in PostgreSQL
+        # 1. Log incident asynchronously in PostgreSQL
         audit_logger.log_incident_async(
             request_id=request_id,
             user_id=user_id,
@@ -322,10 +359,24 @@ async def proxy_protected_api(
             features_snapshot=eval_result.features
         )
 
-        # Auto-Revocation: Blacklist the attacking token JTI in Redis
+        # 2. Auto-Revocation: Blacklist the attacking token JTI in Redis
         if decision.should_revoke_token and jti:
             await blacklist_token(jti, ttl_seconds=3600)
             logger.critical(f"AUTO-REVOCATION TRIGGERED: Blacklisted JTI '{jti}' for attacker '{user_id}'")
+
+        # 3. Broadcast Live Attack Alert to SOC WebSockets
+        threat_event = event_broadcaster.create_event(
+            event_type=decision.threat_type,
+            user_id=user_id,
+            client_ip=client_ip,
+            endpoint=endpoint_path,
+            http_method=request.method,
+            risk_score=decision.risk_score,
+            action="BLOCKED",
+            threat_indicators=decision.threat_indicators,
+            latency_ms=total_latency_ms
+        )
+        await event_broadcaster.broadcast(threat_event)
 
         return JSONResponse(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -376,6 +427,19 @@ async def proxy_protected_api(
         latency_ms=total_latency_ms,
         status_code=downstream_response.status_code
     )
+
+    # Broadcast Normal Request to SOC Dashboard
+    allow_event = event_broadcaster.create_event(
+        event_type="REQUEST_ALLOWED",
+        user_id=user_id,
+        client_ip=client_ip,
+        endpoint=endpoint_path,
+        http_method=request.method,
+        risk_score=eval_result.risk_score,
+        action="ALLOW",
+        latency_ms=total_latency_ms
+    )
+    await event_broadcaster.broadcast(allow_event)
 
     # Attach Rate Limit & AI Headers to Client Response
     rate_limit_result: Optional[RateLimitResult] = getattr(request.state, "rate_limit_result", None)
