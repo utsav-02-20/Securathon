@@ -14,6 +14,7 @@ from core.logger import setup_logger
 from core.redis_client import get_redis_client, close_redis_client, blacklist_token
 from core.security import create_access_token, verify_jwt_token, revoke_token_by_payload
 from core.rate_limiter import rate_limiter, RateLimitResult
+from ml.detector import anomaly_detector, AnomalyDetectionResult
 from gateway.dependencies import get_authenticated_claims, enforce_sliding_window_rate_limit
 from gateway.proxy import get_proxy_client, close_proxy_client, forward_request
 
@@ -97,9 +98,10 @@ async def gateway_health():
         "service": "api-security-gateway",
         "port": settings.gateway_port,
         "backend_target": settings.backend_service_url,
-        "guard_status": "active",
-        "rate_limiter_status": "active (sliding-window)",
-        "rate_limit_window": f"{settings.rate_limit_window_seconds}s"
+        "guard_status": "active (JWT HS256/RS256 + Redis JTI Blacklist)",
+        "rate_limiter_status": "active (atomic sliding-window)",
+        "ai_engine_status": "active (Isolation Forest sub-ms scoring)",
+        "anomaly_threshold": settings.anomaly_score_threshold
     }
 
 
@@ -204,7 +206,6 @@ async def get_current_rate_limit(
     role = claims.get("role", "customer").lower()
     limit = settings.rate_limit_admin if role == "admin" else (settings.rate_limit_merchant if role == "merchant" else settings.rate_limit_customer)
     
-    # Query without adding a new point (using 0 limit mock check or inspect)
     r = await get_redis_client()
     key = f"ratelimit:user:{user_id}"
     now = time.time()
@@ -226,7 +227,7 @@ async def get_current_rate_limit(
 
 
 # ------------------------------------------------------------------------------
-# Core Reverse Proxy Route with Guard + Rate Limiting Pipeline
+# Core Reverse Proxy Route with 4-Step Pipeline: Guard + Rate Limiter + AI Detective
 # ------------------------------------------------------------------------------
 @app.api_route(
     "/api/{path:path}",
@@ -239,46 +240,59 @@ async def proxy_protected_api(
     claims: Dict[str, Any] = Depends(enforce_sliding_window_rate_limit)
 ):
     """
-    STEP 1, 2 & 3 of Gateway Request Lifecycle:
-    1. Intercepts incoming client request.
-    2. Validates cryptographic JWT identity (The Guard).
-    3. Evaluates atomic Redis sliding-window rate limit (Drops bursts in <1ms with 429).
-    4. Injects enriched identity context headers:
-       - X-User-ID: Authenticated subject
-       - X-User-Role: RBAC role
-       - X-Tenant-ID: Organization / Tenant
-       - X-Request-ID: Unique tracing UUID
-       - X-Forwarded-For: Client IP
-       - X-Gateway-Guard: Status flag ('passed')
-    5. Forwards seamlessly to downstream microservice (:8001).
-    6. Appends RFC Rate-Limiting response headers (X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset).
+    REQUEST LIFECYCLE:
+    Step 1: Intercept incoming client request.
+    Step 2: Cryptographic Identity Guard (enforces valid JWT, drops alg:none, checks JTI blacklist).
+    Step 3: Atomic Sliding Window Rate Limiter (drops volumetric floods with 429).
+    Step 4: Behavioral Telemetry Extraction & AI Scoring (Isolation Forest evaluates sequential BOLA patterns in <1ms).
+    Step 5 (Forwarding): Enriches request with X-User-ID, X-Role, and X-Gateway-Risk-Score, and proxies to :8001.
     """
+    user_id = str(claims.get("sub", "unknown_user"))
     request_id = str(uuid.uuid4())
     client_ip = request.client.host if request.client else "127.0.0.1"
 
+    # Step 4: AI Detective Anomaly Scoring
+    raw_body = await request.body()
+    body_text = raw_body.decode("utf-8", errors="ignore") if raw_body else ""
+    
+    eval_result: AnomalyDetectionResult = await anomaly_detector.evaluate_request(
+        user_id=user_id,
+        path=f"/api/{path}",
+        query_string=str(request.query_params),
+        body_text=body_text
+    )
+
     # Enriched context headers for downstream service consumption
     injected_headers = {
-        "X-User-ID": str(claims.get("sub", "")),
+        "X-User-ID": user_id,
         "X-User-Role": str(claims.get("role", "customer")),
         "X-Tenant-ID": str(claims.get("tenant_id", "default")),
         "X-Request-ID": request_id,
         "X-Forwarded-For": client_ip,
-        "X-Gateway-Guard": "passed"
+        "X-Gateway-Guard": "passed",
+        "X-Gateway-Risk-Score": str(eval_result.risk_score),
+        "X-Gateway-Anomaly": str(eval_result.is_anomaly).lower()
     }
 
     downstream_url = f"{settings.backend_service_url}/api/{path}"
     logger.info(
         f"Proxying [{request.method}] /api/{path} -> {downstream_url} | "
-        f"User: {claims.get('sub')} | ReqID: {request_id}"
+        f"User: {user_id} | Risk Score: {eval_result.risk_score} | "
+        f"Anomaly: {eval_result.is_anomaly} | AI Latency: {eval_result.inference_latency_ms}ms"
     )
 
     downstream_response = await forward_request(request, downstream_url, injected_headers)
 
-    # Attach RFC rate-limit headers from Step 3 to downstream response
+    # Attach Step 3 Rate-Limit headers
     rate_limit_result: Optional[RateLimitResult] = getattr(request.state, "rate_limit_result", None)
     if rate_limit_result:
         for header_name, header_value in rate_limit_result.headers.items():
             downstream_response.headers[header_name] = header_value
+
+    # Attach Step 4 AI Telemetry headers
+    downstream_response.headers["X-Gateway-Risk-Score"] = str(eval_result.risk_score)
+    downstream_response.headers["X-Gateway-Anomaly"] = str(eval_result.is_anomaly).lower()
+    downstream_response.headers["X-Gateway-AI-Latency-Ms"] = str(eval_result.inference_latency_ms)
 
     return downstream_response
 
