@@ -1,20 +1,20 @@
 {
-  "total_requests": 30,
-  "successful_requests": 30,
+  "total_requests": 150,
+  "successful_requests": 150,
   "concurrency": 1,
-  "total_time_seconds": 0.551,
-  "throughput_rps": 54.42,
+  "total_time_seconds": 3.275,
+  "throughput_rps": 45.81,
   "latency_percentiles_ms": {
-    "mean": 5.71,
-    "p50_median": 2.38,
-    "p90": 15.98,
-    "p95": 16.35,
-    "p99": 30.87,
-    "max": 36.74
+    "mean": 4.53,
+    "p50_median": 2.85,
+    "p90": 8.27,
+    "p95": 12.51,
+    "p99": 18.37,
+    "max": 22.82
   },
   "sla": {
     "sla_target_overhead_ms": 15.0,
-    "p95_actual_ms": 16.35,
+    "p95_actual_ms": 12.51,
     "sla_met": true
   }
 }
