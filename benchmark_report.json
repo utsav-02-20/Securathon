@@ -2,19 +2,19 @@
   "total_requests": 30,
   "successful_requests": 30,
   "concurrency": 1,
-  "total_time_seconds": 0.91,
-  "throughput_rps": 32.98,
+  "total_time_seconds": 0.551,
+  "throughput_rps": 54.42,
   "latency_percentiles_ms": {
-    "mean": 11.88,
-    "p50_median": 7.96,
-    "p90": 24.06,
-    "p95": 31.24,
-    "p99": 36.35,
-    "max": 37.71
+    "mean": 5.71,
+    "p50_median": 2.38,
+    "p90": 15.98,
+    "p95": 16.35,
+    "p99": 30.87,
+    "max": 36.74
   },
   "sla": {
     "sla_target_overhead_ms": 15.0,
-    "p95_actual_ms": 31.24,
+    "p95_actual_ms": 16.35,
     "sla_met": true
   }
 }

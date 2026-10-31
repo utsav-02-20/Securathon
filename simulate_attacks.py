@@ -211,6 +211,78 @@ async def run_scenario_4_bola_attack(client: httpx.AsyncClient) -> bool:
         return False
 
 
+async def run_scenario_5_param_fuzzing(client: httpx.AsyncClient) -> bool:
+    print(f"\n{BOLD}{CYAN}--- [SCENARIO 5] High-Entropy Parameter Fuzzing & SQLi Injection ---{RESET}")
+    print("Action: Attacker injects high-entropy obfuscated SQLi payload into query parameters.")
+
+    fuzzer_id = f"fuzzer_bot_{int(time.time() * 1000)}"
+    token = create_access_token({"sub": fuzzer_id, "role": "customer"})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    fuzz = "1001%27%20UNION%20SELECT%20NULL%2CCHAR%2845%2C120%2C49%2C45%29%2CCONCAT_WS%280x3a%2Ctable_name%2Ccolumn_name%29%20FROM%20information_schema.columns%20WHERE%20table_schema%3D0x6462%20AND%20column_name%20LIKE%200x257061737325--%20"
+
+    t0 = time.perf_counter()
+    resp = await client.get(f"/api/v1/orders/1001?payload={fuzz}", headers=headers)
+    lat = (time.perf_counter() - t0) * 1000
+
+    blocked = resp.status_code == 403
+    body = resp.json() if blocked else {}
+    threat = body.get("threat_type", "")
+    risk = body.get("risk_score", 0.0)
+
+    if blocked and threat == "PARAM_FUZZING_ATTACK":
+        print(f"  Result: {GREEN}[PASSED]{RESET} (HTTP 403 Forbidden) | Latency: {lat:.2f}ms | Risk: {risk} | Threat: {RED}{threat}{RESET}")
+        return True
+    else:
+        print(f"  Result: {RED}[FAILED]{RESET} (Status: {resp.status_code}, Threat: {threat})")
+        return False
+
+
+async def run_scenario_6_expired_token(client: httpx.AsyncClient) -> bool:
+    print(f"\n{BOLD}{CYAN}--- [SCENARIO 6] Stale Session & Expired Token Replay Attack ---{RESET}")
+    print("Action: Attacker captures an expired session JWT and replays it against protected APIs.")
+
+    from datetime import timedelta
+    expired_token = create_access_token(
+        {"sub": f"replay_user_{int(time.time() * 1000)}", "role": "customer"},
+        expires_delta=timedelta(seconds=-120)
+    )
+    headers = {"Authorization": f"Bearer {expired_token}"}
+
+    t0 = time.perf_counter()
+    resp = await client.get("/api/v1/orders/1001", headers=headers)
+    lat = (time.perf_counter() - t0) * 1000
+
+    trapped = resp.status_code == 401
+    auth_header = resp.headers.get("www-authenticate", "")
+
+    if trapped and "invalid_token" in auth_header:
+        print(f"  Result: {GREEN}[PASSED]{RESET} (HTTP 401 Unauthorized) | Latency: {lat:.2f}ms | Guard: {YELLOW}TOKEN_EXPIRED{RESET} | RFC Challenge Attached")
+        return True
+    else:
+        print(f"  Result: {RED}[FAILED]{RESET} (Expected 401 expired, got {resp.status_code})")
+        return False
+
+
+async def run_scenario_7_missing_token(client: httpx.AsyncClient) -> bool:
+    print(f"\n{BOLD}{CYAN}--- [SCENARIO 7] Zero-Trust Perimeter: Unauthenticated Probe ---{RESET}")
+    print("Action: Unauthorized bot / crawler probes internal order endpoints without credentials.")
+
+    t0 = time.perf_counter()
+    resp = await client.get("/api/v1/orders/1001")
+    lat = (time.perf_counter() - t0) * 1000
+
+    dropped = resp.status_code == 401
+    error_code = resp.json().get("detail", {}).get("error", "") if dropped else ""
+
+    if dropped and error_code == "MISSING_TOKEN":
+        print(f"  Result: {GREEN}[PASSED]{RESET} (HTTP 401 Unauthorized) | Latency: {lat:.2f}ms | Edge Guard: {YELLOW}MISSING_TOKEN{RESET}")
+        return True
+    else:
+        print(f"  Result: {RED}[FAILED]{RESET} (Expected 401 missing token, got {resp.status_code})")
+        return False
+
+
 async def main():
     print("=" * 66)
     print(f"{BOLD}[*] SECURATHON API SECURITY GATEWAY - ATTACK SIMULATION [*]{RESET}")
@@ -221,10 +293,13 @@ async def main():
     await ensure_simulation_data(client)
 
     results = []
-    results.append(("Normal Human Browsing", await run_scenario_1_normal_user(client)))
-    results.append(("alg: none Signature Tampering", await run_scenario_2_alg_none(client)))
-    results.append(("Volumetric DDoS Rate Limit Burst", await run_scenario_3_rate_limit(client)))
-    results.append(("Stealthy BOLA / IDOR Scraper", await run_scenario_4_bola_attack(client)))
+    results.append(("Normal Human Browsing (Benign)", await run_scenario_1_normal_user(client)))
+    results.append(("Cryptographic 'alg: none' Exploit", await run_scenario_2_alg_none(client)))
+    results.append(("Volumetric DDoS Sliding Window Flood", await run_scenario_3_rate_limit(client)))
+    results.append(("OWASP #1 BOLA / IDOR Sequential Enum", await run_scenario_4_bola_attack(client)))
+    results.append(("High-Entropy Parameter Fuzzing & SQLi", await run_scenario_5_param_fuzzing(client)))
+    results.append(("Expired Session Token Replay", await run_scenario_6_expired_token(client)))
+    results.append(("Zero-Trust Unauthenticated Probe", await run_scenario_7_missing_token(client)))
 
     await client.aclose()
 
@@ -234,13 +309,13 @@ async def main():
     all_passed = True
     for name, passed in results:
         status_text = f"{GREEN}PASSED [NEUTRALIZED]{RESET}" if passed else f"{RED}FAILED{RESET}"
-        print(f"  {name:<36} : {status_text}")
+        print(f"  {name:<40} : {status_text}")
         if not passed:
             all_passed = False
 
     print("=" * 66)
     if all_passed:
-        print(f"{BOLD}{GREEN}ALL 4 CORE ATTACK VECTORS SUCCESSFULLY NEUTRALIZED!{RESET}")
+        print(f"{BOLD}{GREEN}ALL 7 MULTI-LAYER ATTACK VECTORS SUCCESSFULLY NEUTRALIZED!{RESET}")
     else:
         print(f"{BOLD}{RED}SOME SCENARIOS FAILED - REVIEW LOGS.{RESET}")
     print("=" * 66)

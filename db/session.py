@@ -32,17 +32,42 @@ def is_postgres_port_open(host: str, port: int, timeout: float = 0.2) -> bool:
 def get_database_url() -> str:
     """
     Selects database connection string.
-    Connects to PostgreSQL if available, otherwise falls back smoothly to SQLite async.
+    - If DATABASE_URL is set, uses it directly (falls back to SQLite if PostgreSQL fails).
+    - If DB_TYPE is 'postgres', connects to PostgreSQL if port is active.
+    - Otherwise defaults cleanly to fast zero-config async SQLite.
     """
-    postgres_available = is_postgres_port_open(settings.postgres_host, settings.postgres_port, timeout=0.15)
-    
-    if postgres_available:
-        logger.info(f"Connected to PostgreSQL database at {settings.postgres_host}:{settings.postgres_port}")
-        return settings.database_url
-    else:
-        sqlite_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "securathon_audit.db")
-        logger.info(f"PostgreSQL port inactive. Using async SQLite fallback at: {sqlite_path}")
-        return f"sqlite+aiosqlite:///{sqlite_path}"
+    sqlite_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "securathon_audit.db")
+    default_sqlite_url = f"sqlite+aiosqlite:///{sqlite_path}"
+
+    # 1. Explicit DATABASE_URL in .env
+    if settings.database_url:
+        db_url = settings.database_url
+        if db_url.startswith("sqlite"):
+            logger.info("Using configured SQLite database from DATABASE_URL.")
+            return db_url
+        elif db_url.startswith("postgres"):
+            if is_postgres_port_open(settings.postgres_host, settings.postgres_port, timeout=0.15):
+                logger.info(f"Connecting to PostgreSQL database: {settings.postgres_host}:{settings.postgres_port}")
+                return db_url
+            else:
+                logger.warning(f"PostgreSQL port inactive. Falling back to SQLite at: {sqlite_path}")
+                return default_sqlite_url
+        return db_url
+
+    # 2. Check DB_TYPE setting
+    if settings.db_type.lower() in ("postgres", "postgresql"):
+        if is_postgres_port_open(settings.postgres_host, settings.postgres_port, timeout=0.15):
+            url = f"postgresql+asyncpg://{settings.postgres_user}:{settings.postgres_password}@{settings.postgres_host}:{settings.postgres_port}/{settings.postgres_db}"
+            logger.info(f"Connected to PostgreSQL database at {settings.postgres_host}:{settings.postgres_port}")
+            return url
+        else:
+            logger.warning(f"PostgreSQL requested but port inactive. Falling back to SQLite at: {sqlite_path}")
+            return default_sqlite_url
+
+    # 3. Default to zero-config SQLite
+    logger.info(f"Using zero-config async SQLite database: {sqlite_path}")
+    return default_sqlite_url
+
 
 
 async def init_db() -> AsyncEngine:

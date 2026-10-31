@@ -8,7 +8,8 @@ from datetime import timedelta
 
 import uvicorn
 from fastapi import FastAPI, Request, Response, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
-from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -20,14 +21,21 @@ from core.rate_limiter import rate_limiter, RateLimitResult
 from core.event_stream import event_broadcaster, ThreatEvent
 from ml.detector import anomaly_detector, AnomalyDetectionResult
 from gateway.mitigation import mitigation_engine, MitigationDecision
-from db.session import init_db, close_db
+from db.session import init_db, close_db, get_database_url
 from db.audit_logger import audit_logger
 from gateway.dependencies import get_authenticated_claims, enforce_sliding_window_rate_limit
 from gateway.proxy import get_proxy_client, close_proxy_client, forward_request
 
 logger = setup_logger("gateway.main")
 
-DASHBOARD_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "dashboard", "index.html")
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+UI_DIR = os.path.join(BASE_DIR, "ui")
+UI_SRC_DIR = os.path.join(UI_DIR, "src")
+UI_PUBLIC_DIR = os.path.join(UI_DIR, "public")
+UI_INDEX_FILE = os.path.join(UI_SRC_DIR, "index.html")
+LEGACY_DASHBOARD_FILE = os.path.join(BASE_DIR, "dashboard", "index.html")
+
+DASHBOARD_FILE = UI_INDEX_FILE if os.path.exists(UI_INDEX_FILE) else LEGACY_DASHBOARD_FILE
 
 
 @asynccontextmanager
@@ -43,11 +51,16 @@ async def lifespan(app: FastAPI):
         await init_db()
         audit_logger.start()
         get_proxy_client()
+        logger.info(f"Source Gateway URL : {settings.source_url} (Listening on {settings.gateway_host}:{settings.gateway_port})")
+        logger.info(f"Target Destination : {settings.backend_service_url}")
+        logger.info(f"Forensic Database  : {get_database_url()}")
+        logger.info(f"Enforce Auth Guard : {settings.require_auth}")
         logger.info("All gateway security layers initialized successfully.")
     except Exception as e:
         logger.error(f"Error initializing gateway dependencies: {e}")
     yield
     logger.info("Shutting down Security Gateway...")
+
     await close_proxy_client()
     await audit_logger.stop()
     await close_db()
@@ -70,6 +83,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Decoupled Standalone UI Static Mount
+if os.path.exists(UI_SRC_DIR):
+    app.mount("/ui", StaticFiles(directory=UI_SRC_DIR), name="ui")
 
 
 # ------------------------------------------------------------------------------
@@ -109,13 +126,17 @@ async def gateway_health():
     return {
         "status": "healthy",
         "service": "api-security-gateway",
+        "source_url": settings.source_url,
+        "destination_url": settings.backend_service_url,
         "port": settings.gateway_port,
         "backend_target": settings.backend_service_url,
+        "db_type": settings.db_type,
+        "require_auth": settings.require_auth,
         "guard_status": "active (JWT HS256/RS256 + Redis JTI Blacklist)",
         "rate_limiter_status": "active (atomic sliding-window)",
         "ai_engine_status": "active (Isolation Forest sub-ms scoring)",
         "mitigation_pipeline": "active (Allow / Tarpit / Block / Auto-Revoke)",
-        "audit_store": "active (PostgreSQL / asyncpg non-blocking)",
+        "audit_store": f"active ({'SQLite' if 'sqlite' in get_database_url() else 'PostgreSQL'} non-blocking)",
         "soc_dashboard": "active (/dashboard, /ws/security-stream)",
         "anomaly_threshold": settings.anomaly_score_threshold
     }
@@ -129,6 +150,9 @@ async def root_redirect():
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
+    fav_file = os.path.join(UI_PUBLIC_DIR, "favicon.svg")
+    if os.path.exists(fav_file):
+        return FileResponse(fav_file, media_type="image/svg+xml")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -281,16 +305,27 @@ async def get_security_summary():
 # ------------------------------------------------------------------------------
 # Complete Request Lifecycle: Steps 1 through 5 with Live Event Broadcasting
 # ------------------------------------------------------------------------------
-@app.api_route(
-    "/api/{path:path}",
-    methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
-    tags=["Reverse Proxy"]
-)
-async def proxy_protected_api(
+def build_downstream_url(path: str, is_raw: bool = False) -> str:
+    """
+    Constructs the target downstream URL based on configured DESTINATION_URL.
+    - is_raw=True: Forwards directly to {DESTINATION_URL}/{path} without '/api/' prefix.
+    - is_raw=False: Forwards to {DESTINATION_URL}/api/{path} (or {DESTINATION_URL}/{path} if DESTINATION_URL already ends with /api).
+    """
+    base = settings.backend_service_url.rstrip("/")
+    clean_path = path.lstrip("/")
+    if is_raw:
+        return f"{base}/{clean_path}" if clean_path else base
+    if base.endswith("/api"):
+        return f"{base}/{clean_path}"
+    return f"{base}/api/{clean_path}"
+
+
+async def execute_proxy_pipeline(
     path: str,
     request: Request,
-    claims: Dict[str, Any] = Depends(enforce_sliding_window_rate_limit)
-):
+    claims: Dict[str, Any],
+    is_raw: bool = False
+) -> Response:
     """
     COMPLETE 5-STEP REQUEST PIPELINE WITH LIVE EVENT STREAMING:
     Step 1: Ingestion by reverse proxy.
@@ -300,14 +335,15 @@ async def proxy_protected_api(
     Step 5: Threat Mitigation, Forensic Persistence & Live SOC Event Streaming:
             - Block (403): Malicious BOLA/IDOR attacks stopped, JTI auto-revoked, streamed to SOC.
             - Tarpit: Artificial delay injected to exhaust attacker sockets.
-            - Allow: Context injected, proxied to :8001, telemetry broadcasted to SOC.
+            - Allow: Context injected, proxied to Destination URL, telemetry broadcasted to SOC.
     """
     t_start = time.perf_counter()
     user_id = str(claims.get("sub", "unknown_user"))
     jti = str(claims.get("jti", ""))
     request_id = str(uuid.uuid4())
     client_ip = request.client.host if request.client else "127.0.0.1"
-    endpoint_path = f"/api/{path}"
+    clean_path = path.lstrip("/")
+    endpoint_path = f"/{clean_path}" if is_raw else f"/api/{clean_path}"
 
     # Extract Payload for Telemetry
     raw_body = await request.body()
@@ -327,7 +363,7 @@ async def proxy_protected_api(
 
     # Check 1: Action is BLOCK (HTTP 403)
     if decision.action == "BLOCK":
-        # 1. Log incident asynchronously in PostgreSQL
+        # 1. Log incident asynchronously in Database
         audit_logger.log_incident_async(
             request_id=request_id,
             user_id=user_id,
@@ -396,7 +432,7 @@ async def proxy_protected_api(
         "X-Gateway-Anomaly": str(eval_result.is_anomaly).lower()
     }
 
-    downstream_url = f"{settings.backend_service_url}/api/{path}"
+    downstream_url = build_downstream_url(path, is_raw=is_raw)
     proxy_overhead_ms = round((time.perf_counter() - t_start) * 1000, 2)
     downstream_response = await forward_request(request, downstream_url, injected_headers)
 
@@ -440,9 +476,43 @@ async def proxy_protected_api(
     return downstream_response
 
 
+@app.api_route(
+    "/api/{path:path}",
+    methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
+    tags=["Reverse Proxy"]
+)
+async def proxy_protected_api(
+    path: str,
+    request: Request,
+    claims: Dict[str, Any] = Depends(enforce_sliding_window_rate_limit)
+):
+    """Proxies API requests, preserving or appending /api/ prefix as needed."""
+    return await execute_proxy_pipeline(path=path, request=request, claims=claims, is_raw=False)
+
+
+@app.api_route(
+    "/proxy/{path:path}",
+    methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
+    tags=["Reverse Proxy (Custom Target)"]
+)
+async def proxy_custom_destination(
+    path: str,
+    request: Request,
+    claims: Dict[str, Any] = Depends(enforce_sliding_window_rate_limit)
+):
+    """
+    Direct reverse proxy forwarding without adding '/api/' to the destination URL.
+    Ideal for testing custom external applications with arbitrary route structures.
+    """
+    return await execute_proxy_pipeline(path=path, request=request, claims=claims, is_raw=True)
+
+
 def start():
     """Starts the Security Gateway service on configured host:port."""
     logger.info(f"Starting Intelligent API Security Gateway on {settings.gateway_host}:{settings.gateway_port}")
+    logger.info(f"Source Gateway URL : {settings.source_url}")
+    logger.info(f"Target Destination : {settings.backend_service_url}")
+    logger.info(f"Forensic Database  : {get_database_url()}")
     uvicorn.run(
         "gateway.main:app",
         host=settings.gateway_host,
@@ -454,3 +524,4 @@ def start():
 
 if __name__ == "__main__":
     start()
+

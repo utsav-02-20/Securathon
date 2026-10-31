@@ -31,8 +31,8 @@ def is_port_open(host: str, port: int, timeout: float = 0.2) -> bool:
         return False
 
 
-async def get_test_client() -> Tuple[httpx.AsyncClient, str]:
-    gateway_running = is_port_open(settings.gateway_host if settings.gateway_host != "0.0.0.0" else "127.0.0.1", settings.gateway_port)
+async def get_test_client(force_in_process: bool = False) -> Tuple[httpx.AsyncClient, str]:
+    gateway_running = False if force_in_process else is_port_open(settings.gateway_host if settings.gateway_host != "0.0.0.0" else "127.0.0.1", settings.gateway_port)
     if gateway_running:
         base_url = f"http://127.0.0.1:{settings.gateway_port}"
         client = httpx.AsyncClient(base_url=base_url, timeout=10.0)
@@ -48,13 +48,13 @@ async def get_test_client() -> Tuple[httpx.AsyncClient, str]:
     return client, mode
 
 
-async def run_benchmark(n_requests: int = 150, concurrency: int = 1) -> Dict[str, Any]:
+async def run_benchmark(n_requests: int = 150, concurrency: int = 1, force_in_process: bool = False) -> Dict[str, Any]:
     """
     Executes a high-precision throughput and latency benchmark against the Gateway pipeline.
     Validates the strict sub-15ms proxy latency SLA.
     """
     print(f"\n[*] Starting Gateway Latency & Throughput Benchmark ({n_requests} requests, concurrency={concurrency})...")
-    client, mode = await get_test_client()
+    client, mode = await get_test_client(force_in_process=force_in_process)
     print(f"Target Mode: {mode}")
 
     # Use Admin token to avoid hitting standard user rate limits during high-volume benchmarking

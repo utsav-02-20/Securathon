@@ -1,24 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Securathon | SOC Threat Observability Engine</title>
-
+  <title>Securathon | SECURATHON SOC Threat Observability Engine</title>
+  
   <!-- Tailwind CSS & Chart.js -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
+  
   <!-- FontAwesome 6 Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
   <!-- Google Fonts: Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap"
-    rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <script>
     tailwind.config = {
@@ -51,7 +48,7 @@
     /* Dark Pitch Black Vignette Background */
     body {
       background-color: #040407;
-      background-image:
+      background-image: 
         radial-gradient(circle at 50% 0%, rgba(255, 0, 60, 0.12) 0%, transparent 60%),
         radial-gradient(circle at 85% 90%, rgba(255, 0, 60, 0.04) 0%, transparent 45%),
         linear-gradient(to right, rgba(255, 0, 60, 0.02) 1px, transparent 1px),
@@ -63,17 +60,17 @@
     /* Dark Neumorphic Outset Shadow Card */
     .neo-card {
       background: #0b0d13;
-      box-shadow:
-        5px 5px 12px rgba(0, 0, 0, 0.8),
+      box-shadow: 
+        5px 5px 12px rgba(0, 0, 0, 0.8), 
         -3px -3px 10px rgba(255, 255, 255, 0.02),
         inset 0 0 0 1px rgba(255, 0, 60, 0.12);
       border-radius: 12px;
       transition: all 0.25s ease;
     }
-
+    
     .neo-card:hover {
-      box-shadow:
-        7px 7px 16px rgba(0, 0, 0, 0.9),
+      box-shadow: 
+        7px 7px 16px rgba(0, 0, 0, 0.9), 
         -4px -4px 12px rgba(255, 255, 255, 0.035),
         inset 0 0 0 1px rgba(255, 0, 60, 0.35);
     }
@@ -81,8 +78,8 @@
     /* Dark Neumorphic Inset Surface (Inputs, Tables, Panels) */
     .neo-inset {
       background: #06070a;
-      box-shadow:
-        inset 3px 3px 6px rgba(0, 0, 0, 0.85),
+      box-shadow: 
+        inset 3px 3px 6px rgba(0, 0, 0, 0.85), 
         inset -2px -2px 5px rgba(255, 255, 255, 0.02),
         inset 0 0 0 1px rgba(255, 0, 60, 0.08);
     }
@@ -90,8 +87,8 @@
     /* Neumorphic Interactive Button */
     .neo-btn {
       background: linear-gradient(145deg, #0d0f17, #07080d);
-      box-shadow:
-        3px 3px 8px rgba(0, 0, 0, 0.7),
+      box-shadow: 
+        3px 3px 8px rgba(0, 0, 0, 0.7), 
         -2px -2px 6px rgba(255, 255, 255, 0.025),
         inset 0 0 0 1px rgba(255, 0, 60, 0.25);
       transition: all 0.2s ease;
@@ -99,16 +96,16 @@
 
     .neo-btn:hover {
       background: linear-gradient(145deg, #15050a, #0b0205);
-      box-shadow:
-        4px 4px 12px rgba(0, 0, 0, 0.85),
+      box-shadow: 
+        4px 4px 12px rgba(0, 0, 0, 0.85), 
         -2px -2px 8px rgba(255, 255, 255, 0.04),
         inset 0 0 0 1px rgba(255, 0, 60, 0.6);
       color: #ff003c;
     }
 
     .neo-btn:active {
-      box-shadow:
-        inset 3px 3px 6px rgba(0, 0, 0, 0.9),
+      box-shadow: 
+        inset 3px 3px 6px rgba(0, 0, 0, 0.9), 
         inset -2px -2px 4px rgba(255, 255, 255, 0.02);
     }
 
@@ -121,17 +118,14 @@
       width: 6px;
       height: 6px;
     }
-
     ::-webkit-scrollbar-track {
       background: #040407;
     }
-
     ::-webkit-scrollbar-thumb {
       background: #2b000a;
       border-radius: 4px;
       border: 1px solid rgba(255, 0, 60, 0.3);
     }
-
     ::-webkit-scrollbar-thumb:hover {
       background: #ff003c;
     }
@@ -139,52 +133,28 @@
     /* Scanline Sweep Effect */
     .scanline {
       position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 2px;
+      top: 0; left: 0; right: 0; height: 2px;
       background: linear-gradient(90deg, transparent, #ff003c, transparent);
       opacity: 0.5;
       animation: scan 5s linear infinite;
     }
-
     @keyframes scan {
-      0% {
-        top: 0%;
-        opacity: 0;
-      }
-
-      15% {
-        opacity: 0.7;
-      }
-
-      85% {
-        opacity: 0.7;
-      }
-
-      100% {
-        top: 100%;
-        opacity: 0;
-      }
+      0% { top: 0%; opacity: 0; }
+      15% { opacity: 0.7; }
+      85% { opacity: 0.7; }
+      100% { top: 100%; opacity: 0; }
     }
 
     /* Table Row Flash on Insert */
     @keyframes newRow {
-      0% {
-        background-color: rgba(255, 0, 60, 0.3);
-      }
-
-      100% {
-        background-color: transparent;
-      }
+      0% { background-color: rgba(255, 0, 60, 0.3); }
+      100% { background-color: transparent; }
     }
-
     .row-new {
       animation: newRow 1.4s cubic-bezier(0.1, 0.9, 0.2, 1);
     }
   </style>
 </head>
-
 <body class="font-sans antialiased min-h-screen p-4 md:p-6 lg:p-8 relative selection:bg-crimson selection:text-white">
 
   <!-- Visual Accent Scanline effect -->
@@ -193,11 +163,9 @@
   </div>
 
   <!-- Header -->
-  <header
-    class="flex flex-col md:flex-row justify-between items-start md:items-center pb-6 mb-6 border-b border-crimson-dark/40 gap-4 relative">
+  <header class="flex flex-col md:flex-row justify-between items-start md:items-center pb-6 mb-6 border-b border-crimson-dark/40 gap-4 relative">
     <div class="flex items-center gap-4">
-      <div
-        class="w-12 h-12 rounded-xl neo-card flex items-center justify-center text-crimson text-xl shadow-[0_0_15px_rgba(255,0,60,0.3)]">
+      <div class="w-12 h-12 rounded-xl neo-card flex items-center justify-center text-crimson text-xl shadow-[0_0_15px_rgba(255,0,60,0.3)]">
         <i class="fa-solid fa-shield-halved"></i>
       </div>
       <div>
@@ -205,8 +173,7 @@
           <h1 class="font-mono text-2xl font-black tracking-wider text-white">
             SECURATHON <span class="text-crimson crimson-text-glow">SOC</span>
           </h1>
-          <span
-            class="px-3 py-1 rounded-full text-[10px] font-mono font-bold tracking-widest bg-crimson-dim text-crimson border border-crimson/40 flex items-center gap-2 shadow-[0_0_10px_rgba(255,0,60,0.3)]">
+          <span class="px-3 py-1 rounded-full text-[10px] font-mono font-bold tracking-widest bg-crimson-dim text-crimson border border-crimson/40 flex items-center gap-2 shadow-[0_0_10px_rgba(255,0,60,0.3)]">
             <span class="w-2 h-2 rounded-full bg-crimson animate-ping" id="ws-pulse"></span>
             <span id="ws-status">INITIALIZING</span>
           </span>
@@ -220,8 +187,7 @@
 
     <!-- Header Clock & System Status -->
     <div class="flex items-center gap-4">
-      <div
-        class="flex items-center gap-2 px-3.5 py-2 rounded-lg neo-inset font-mono text-xs border border-crimson-dark/40">
+      <div class="flex items-center gap-2 px-3.5 py-2 rounded-lg neo-inset font-mono text-xs border border-crimson-dark/40">
         <i class="fa-solid fa-shield-cat text-crimson"></i>
         <span class="text-gray-400">DEFENSE:</span>
         <span class="text-crimson font-bold" id="sys-mode">ENFORCING</span>
@@ -231,8 +197,7 @@
           <i class="fa-solid fa-clock text-crimson/80 text-xs"></i> 00:00:00 UTC
         </div>
         <div class="text-[10px] font-mono text-crimson/70 mt-0.5">
-          <i class="fa-solid fa-network-wired text-[9px]"></i> GATEWAY LATENCY: <span id="ping-ms"
-            class="text-emerald-400 font-bold">2.4ms</span>
+          <i class="fa-solid fa-network-wired text-[9px]"></i> GATEWAY LATENCY: <span id="ping-ms" class="text-emerald-400 font-bold">2.4ms</span>
         </div>
       </div>
     </div>
@@ -240,15 +205,14 @@
 
   <!-- Metric KPI Cards -->
   <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
-
+    
     <!-- Card 1: Total Screened -->
     <div class="neo-card p-5">
       <div class="flex justify-between items-start mb-2">
         <span class="text-xs font-mono font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
           <i class="fa-solid fa-filter text-cyan-400"></i> Total Screened
         </span>
-        <span
-          class="text-[10px] font-mono text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/40">LIVE</span>
+        <span class="text-[10px] font-mono text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/40">LIVE</span>
       </div>
       <div class="text-3xl font-mono font-black text-white tracking-tight" id="kpi-screened">0</div>
       <div class="mt-2 text-[11px] font-mono text-gray-400 flex items-center gap-1.5">
@@ -263,8 +227,7 @@
         <span class="text-xs font-mono font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
           <i class="fa-solid fa-skull-crossbones text-crimson"></i> Intercepted
         </span>
-        <span
-          class="text-[10px] font-mono text-crimson bg-crimson-dim px-2 py-0.5 rounded border border-crimson/40 animate-pulse">DROPPED</span>
+        <span class="text-[10px] font-mono text-crimson bg-crimson-dim px-2 py-0.5 rounded border border-crimson/40 animate-pulse">DROPPED</span>
       </div>
       <div class="text-3xl font-mono font-black text-crimson crimson-text-glow tracking-tight" id="kpi-blocked">0</div>
       <div class="mt-2 text-[11px] font-mono text-gray-400 flex items-center justify-between">
@@ -279,13 +242,11 @@
         <span class="text-xs font-mono font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
           <i class="fa-solid fa-gauge-high text-amber-400"></i> Anomaly Rate
         </span>
-        <span
-          class="text-[10px] font-mono text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/40">RATIO</span>
+        <span class="text-[10px] font-mono text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/40">RATIO</span>
       </div>
       <div class="text-3xl font-mono font-black text-amber-400 tracking-tight" id="kpi-rate">0.0%</div>
       <div class="w-full neo-inset rounded-full h-1.5 mt-3 overflow-hidden">
-        <div class="bg-amber-400 h-full rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"
-          id="kpi-rate-bar" style="width: 0%"></div>
+        <div class="bg-amber-400 h-full rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" id="kpi-rate-bar" style="width: 0%"></div>
       </div>
     </div>
 
@@ -295,9 +256,7 @@
         <span class="text-xs font-mono font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
           <i class="fa-solid fa-brain text-purple-400"></i> Inference Latency
         </span>
-        <span
-          class="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40">v4
-          INLINE</span>
+        <span class="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40">v4 INLINE</span>
       </div>
       <div class="text-3xl font-mono font-black text-emerald-400 tracking-tight" id="kpi-latency">&lt; 2.4ms</div>
       <div class="mt-2 text-[11px] font-mono text-gray-400 flex items-center justify-between">
@@ -312,7 +271,7 @@
 
   <!-- Dedicated Dark Neumorphic Widgets: Top Calling IPs & Top Blocked Bots -->
   <section class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
-
+    
     <!-- Top IP Calling Requests Widget -->
     <div class="neo-card p-5">
       <div class="flex items-center justify-between mb-4 pb-2.5 border-b border-crimson-dark/30">
@@ -360,8 +319,7 @@
 
     <!-- Left 2 Columns: Live Incident Feed Table -->
     <div class="lg:col-span-2 neo-card p-5 flex flex-col h-[670px]">
-      <div
-        class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 pb-3 border-b border-crimson-dark/30">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 pb-3 border-b border-crimson-dark/30">
         <div class="flex items-center gap-3">
           <div class="w-8 h-8 rounded-lg neo-inset flex items-center justify-center text-crimson">
             <i class="fa-solid fa-[#ff003c] fa-radar text-sm"></i>
@@ -374,17 +332,13 @@
             <p class="text-[10px] font-mono text-gray-500">REALTIME API GATEWAY INSPECTION FEED</p>
           </div>
         </div>
-
+        
         <div class="flex items-center gap-2.5">
-          <span
-            class="text-[10px] font-mono bg-crimson-dim text-crimson px-2.5 py-1 rounded-md border border-crimson/40 font-bold"
-            id="stream-count-badge">0 Events</span>
-          <button onclick="togglePauseStream()" id="pause-btn"
-            class="neo-btn px-3 py-1.5 text-gray-300 hover:text-white rounded-md text-xs font-mono flex items-center gap-1.5">
+          <span class="text-[10px] font-mono bg-crimson-dim text-crimson px-2.5 py-1 rounded-md border border-crimson/40 font-bold" id="stream-count-badge">0 Events</span>
+          <button onclick="togglePauseStream()" id="pause-btn" class="neo-btn px-3 py-1.5 text-gray-300 hover:text-white rounded-md text-xs font-mono flex items-center gap-1.5">
             <i class="fa-solid fa-pause text-[10px]"></i> Pause
           </button>
-          <button onclick="clearFeed()"
-            class="neo-btn px-3 py-1.5 text-gray-300 hover:text-white rounded-md text-xs font-mono flex items-center gap-1.5">
+          <button onclick="clearFeed()" class="neo-btn px-3 py-1.5 text-gray-300 hover:text-white rounded-md text-xs font-mono flex items-center gap-1.5">
             <i class="fa-solid fa-trash-can text-[10px]"></i> Clear
           </button>
         </div>
@@ -399,8 +353,7 @@
               <th class="p-3"><i class="fa-solid fa-bug text-crimson/70 mr-1.5"></i>CLASSIFICATION</th>
               <th class="p-3"><i class="fa-solid fa-terminal text-crimson/70 mr-1.5"></i>SOURCE IP / ID</th>
               <th class="p-3"><i class="fa-solid fa-link text-crimson/70 mr-1.5"></i>TARGET ENDPOINT</th>
-              <th class="p-3 text-center"><i class="fa-solid fa-triangle-exclamation text-crimson/70 mr-1.5"></i>RISK
-              </th>
+              <th class="p-3 text-center"><i class="fa-solid fa-triangle-exclamation text-crimson/70 mr-1.5"></i>RISK</th>
               <th class="p-3 text-right"><i class="fa-solid fa-shield text-crimson/70 mr-1.5"></i>MITIGATION</th>
             </tr>
           </thead>
@@ -413,7 +366,7 @@
 
     <!-- Right 1 Column: Visual Charts & Security Policies -->
     <div class="space-y-6">
-
+      
       <!-- Threat Category Distribution Chart -->
       <div class="neo-card p-5">
         <div class="flex justify-between items-center mb-4 pb-2.5 border-b border-crimson-dark/30">
@@ -438,7 +391,7 @@
           </span>
         </div>
         <p class="text-[11px] text-gray-400 mb-3.5 font-mono">Real-time inline inspection layers on gateway proxy:</p>
-
+        
         <div class="space-y-2.5 font-mono text-xs">
           <!-- Policy Item 1 -->
           <div class="p-3 rounded-lg neo-inset flex justify-between items-center">
@@ -446,8 +399,7 @@
               <i class="fa-solid fa-key text-crimson"></i>
               <span class="text-gray-200 font-medium">Cryptographic Guard</span>
             </div>
-            <span
-              class="text-[10px] px-2.5 py-0.5 bg-emerald-950/60 text-emerald-400 border border-emerald-800/50 rounded font-bold">ENFORCING</span>
+            <span class="text-[10px] px-2.5 py-0.5 bg-emerald-950/60 text-emerald-400 border border-emerald-800/50 rounded font-bold">ENFORCING</span>
           </div>
 
           <!-- Policy Item 2 -->
@@ -456,8 +408,7 @@
               <i class="fa-solid fa-ban text-crimson"></i>
               <span class="text-gray-200 font-medium">'alg: none' Hard-Block</span>
             </div>
-            <span
-              class="text-[10px] px-2.5 py-0.5 bg-crimson-dim text-crimson border border-crimson/50 rounded font-bold">ACTIVE</span>
+            <span class="text-[10px] px-2.5 py-0.5 bg-crimson-dim text-crimson border border-crimson/50 rounded font-bold">ACTIVE</span>
           </div>
 
           <!-- Policy Item 3 -->
@@ -466,8 +417,7 @@
               <i class="fa-solid fa-stopwatch text-amber-400"></i>
               <span class="text-gray-200 font-medium">Atomic Rate Limiter (ZSET)</span>
             </div>
-            <span
-              class="text-[10px] px-2.5 py-0.5 bg-amber-950/60 text-amber-400 border border-amber-800/50 rounded font-bold">PROTECTING</span>
+            <span class="text-[10px] px-2.5 py-0.5 bg-amber-950/60 text-amber-400 border border-amber-800/50 rounded font-bold">PROTECTING</span>
           </div>
 
           <!-- Policy Item 4 -->
@@ -476,16 +426,13 @@
               <i class="fa-solid fa-brain text-purple-400"></i>
               <span class="text-gray-200 font-medium">AI Behavioral Detective</span>
             </div>
-            <span
-              class="text-[10px] px-2.5 py-0.5 bg-purple-950/60 text-purple-300 border border-purple-800/50 rounded font-bold">&lt;1ms
-              INFERENCE</span>
+            <span class="text-[10px] px-2.5 py-0.5 bg-purple-950/60 text-purple-300 border border-purple-800/50 rounded font-bold">&lt;1ms INFERENCE</span>
           </div>
         </div>
 
         <!-- Manual Injection Control Button -->
         <div class="mt-4 pt-3 border-t border-crimson-dark/30">
-          <button onclick="injectSampleThreat()"
-            class="w-full neo-btn py-2.5 text-crimson font-mono text-xs rounded-lg font-bold flex items-center justify-center gap-2 shadow-[0_0_12px_rgba(255,0,60,0.2)]">
+          <button onclick="injectSampleThreat()" class="w-full neo-btn py-2.5 text-crimson font-mono text-xs rounded-lg font-bold flex items-center justify-center gap-2 shadow-[0_0_12px_rgba(255,0,60,0.2)]">
             <i class="fa-solid fa-bolt text-xs"></i> Inject Test Attack Vector
           </button>
         </div>
@@ -499,7 +446,10 @@
   <script>
     // System UTC Clock
     setInterval(() => {
-      document.getElementById('clock').innerHTML = `<i class="fa-solid fa-clock text-crimson/80 text-xs"></i> ${new Date().toUTCString().slice(17, 25)} UTC`;
+      const clockEl = document.getElementById('clock');
+      if (clockEl) {
+        clockEl.innerHTML = `<i class="fa-solid fa-clock text-crimson/80 text-xs"></i> ${new Date().toUTCString().slice(17, 25)} UTC`;
+      }
     }, 1000);
 
     // Global Metrics State
@@ -573,15 +523,21 @@
 
     // Update KPI Displays & Sub-widgets
     function updateKPIs() {
-      document.getElementById('kpi-screened').innerText = screenedCount.toLocaleString();
-      document.getElementById('kpi-blocked').innerText = blockedCount.toLocaleString();
-
+      const elScreened = document.getElementById('kpi-screened');
+      const elBlocked = document.getElementById('kpi-blocked');
+      if (elScreened) elScreened.innerText = screenedCount.toLocaleString();
+      if (elBlocked) elBlocked.innerText = blockedCount.toLocaleString();
+      
       const rateNum = screenedCount > 0 ? ((blockedCount / screenedCount) * 100) : 0;
       const rateStr = rateNum.toFixed(1);
-
-      document.getElementById('kpi-rate').innerText = rateStr + '%';
-      document.getElementById('kpi-rate-bar').style.width = Math.min(rateNum, 100) + '%';
-      document.getElementById('kpi-blocked-percent').innerText = rateStr + '% ratio';
+      
+      const elRate = document.getElementById('kpi-rate');
+      const elRateBar = document.getElementById('kpi-rate-bar');
+      const elBlockedPercent = document.getElementById('kpi-blocked-percent');
+      
+      if (elRate) elRate.innerText = rateStr + '%';
+      if (elRateBar) elRateBar.style.width = Math.min(rateNum, 100) + '%';
+      if (elBlockedPercent) elBlockedPercent.innerText = rateStr + '% ratio';
 
       threatChart.data.datasets[0].data = [
         threatCounts["BOLA_IDOR_ATTACK"],
@@ -602,7 +558,7 @@
         .slice(0, 4);
 
       const container = document.getElementById('top-ips-container');
-      if (sortedIPs.length === 0) return;
+      if (!container || sortedIPs.length === 0) return;
 
       const maxVal = sortedIPs[0][1] || 1;
 
@@ -633,6 +589,7 @@
         .slice(0, 4);
 
       const container = document.getElementById('top-bots-container');
+      if (!container) return;
       const maxVal = Math.max(...sortedBots.map(b => b[1]), 1);
 
       container.innerHTML = sortedBots.map(([bot, count], index) => {
@@ -660,27 +617,60 @@
       if (isPaused) return;
 
       screenedCount++;
-      if (event.action === "BLOCKED" || event.action === "TARPIT") blockedCount++;
+      const isBlocked = event.action === "BLOCKED" || event.action === "TARPIT";
+      if (isBlocked) blockedCount++;
+      
+      // Normalize event types from backend and simulations
+      let rawType = event.event_type || (isBlocked ? "BOLA_IDOR_ATTACK" : "BENIGN");
+      let typeKey = "BENIGN";
+      if (rawType.includes("BOLA") || rawType.includes("IDOR")) {
+        typeKey = "BOLA_IDOR_ATTACK";
+      } else if (rawType.includes("RATE_LIMIT") || rawType.includes("BURST")) {
+        typeKey = "RATE_LIMIT_DROP";
+      } else if (rawType.includes("ALG_NONE") || rawType.includes("SIGNATURE")) {
+        typeKey = "ALG_NONE_EXPLOIT";
+      } else if (rawType.includes("TOKEN") || rawType.includes("AUTH")) {
+        typeKey = "TOKEN_REVOKED";
+      } else if (rawType === "REQUEST_ALLOWED" || rawType === "BENIGN") {
+        typeKey = "BENIGN";
+      } else {
+        typeKey = isBlocked ? "BOLA_IDOR_ATTACK" : "BENIGN";
+      }
+      
+      threatCounts[typeKey] = (threatCounts[typeKey] || 0) + 1;
 
-      const typeKey = threatCounts.hasOwnProperty(event.event_type) ? event.event_type : (event.action === "BLOCKED" ? "BOLA_IDOR_ATTACK" : "BENIGN");
-      threatCounts[typeKey]++;
-
-      // Record IP Stats
-      const ip = event.ip || event.user_id || `192.168.1.${Math.floor(Math.random() * 250 + 1)}`;
+      // Record IP Stats (robust field detection)
+      const ip = event.client_ip || event.ip || event.user_id || `192.168.1.${Math.floor(Math.random() * 250 + 1)}`;
       ipCounts[ip] = (ipCounts[ip] || 0) + 1;
 
       // Record Bot Signature Stats
-      if (event.bot_signature && botCounts.hasOwnProperty(event.bot_signature)) {
-        botCounts[event.bot_signature]++;
-      } else if (event.action === "BLOCKED") {
+      let signature = event.bot_signature;
+      if (!signature && event.threat_indicators && event.threat_indicators.length > 0) {
+        signature = event.threat_indicators[0].replace(/_/g, ' ');
+      }
+      if (signature && botCounts.hasOwnProperty(signature)) {
+        botCounts[signature]++;
+      } else if (isBlocked) {
         const botKeys = Object.keys(botCounts);
-        const randomBot = botKeys[Math.floor(Math.random() * botKeys.length)];
-        botCounts[randomBot]++;
+        const randomBot = signature || botKeys[Math.floor(Math.random() * botKeys.length)];
+        botCounts[randomBot] = (botCounts[randomBot] || 0) + 1;
+      }
+
+      // Update Latency if provided
+      if (event.latency_ms) {
+        const lat = parseFloat(event.latency_ms);
+        const latStr = (lat < 1 ? lat.toFixed(2) : lat.toFixed(1)) + 'ms';
+        const pingEl = document.getElementById('ping-ms');
+        const kpiLatEl = document.getElementById('kpi-latency');
+        if (pingEl) pingEl.innerText = latStr;
+        if (kpiLatEl) kpiLatEl.innerText = latStr;
       }
 
       updateKPIs();
 
       const tbody = document.getElementById('feed-tbody');
+      if (!tbody) return;
+
       const row = document.createElement('tr');
       row.className = 'row-new hover:bg-crimson-dim/20 transition-colors border-b border-crimson-dark/20';
 
@@ -693,17 +683,18 @@
         actionPill = '<span class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-emerald-950/60 text-emerald-400 border border-emerald-800/50"><i class="fa-solid fa-circle-check mr-1"></i>ALLOW 200</span>';
       }
 
-      const scoreColor = event.risk_score >= 0.75 ? '#ff003c' : (event.risk_score >= 0.50 ? '#f59e0b' : '#10b981');
-      const scoreBarWidth = Math.min(100, Math.round(event.risk_score * 100));
+      const riskNum = typeof event.risk_score === 'number' ? event.risk_score : parseFloat(event.risk_score || 0);
+      const scoreColor = riskNum >= 0.75 ? '#ff003c' : (riskNum >= 0.50 ? '#f59e0b' : '#10b981');
+      const scoreBarWidth = Math.min(100, Math.round(riskNum * 100));
       const timeStr = event.timestamp ? event.timestamp.slice(11, 19) : new Date().toISOString().slice(11, 19);
 
       row.innerHTML = `
         <td class="p-3 text-gray-400 whitespace-nowrap">${timeStr}</td>
-        <td class="p-3 font-semibold ${event.action === 'BLOCKED' ? 'text-crimson' : 'text-gray-200'}">${event.event_type}</td>
+        <td class="p-3 font-semibold ${isBlocked ? 'text-crimson' : 'text-gray-200'}">${event.event_type || 'INSPECTION'}</td>
         <td class="p-3"><code class="text-cyan-300 text-[11px] bg-[#040407] px-2 py-0.5 rounded border border-gray-800/80">${ip}</code></td>
         <td class="p-3"><code class="text-gray-300 text-[11px]">${event.endpoint || '/api/v1/resource'}</code></td>
         <td class="p-3 text-center whitespace-nowrap">
-          <span class="font-bold mr-1.5" style="color: ${scoreColor};">${event.risk_score}</span>
+          <span class="font-bold mr-1.5" style="color: ${scoreColor};">${riskNum.toFixed(2)}</span>
           <div class="w-12 h-1.5 neo-card rounded-full inline-block overflow-hidden align-middle">
             <div class="h-full rounded-full" style="width: ${scoreBarWidth}%; background-color: ${scoreColor};"></div>
           </div>
@@ -712,7 +703,8 @@
       `;
 
       tbody.insertBefore(row, tbody.firstChild);
-      document.getElementById('stream-count-badge').innerText = `${tbody.children.length} Events`;
+      const badge = document.getElementById('stream-count-badge');
+      if (badge) badge.innerText = `${tbody.children.length} Events`;
 
       // Limit feed length to 60 items
       if (tbody.children.length > 60) {
@@ -721,13 +713,16 @@
     }
 
     function clearFeed() {
-      document.getElementById('feed-tbody').innerHTML = '';
-      document.getElementById('stream-count-badge').innerText = '0 Events';
+      const tbody = document.getElementById('feed-tbody');
+      if (tbody) tbody.innerHTML = '';
+      const badge = document.getElementById('stream-count-badge');
+      if (badge) badge.innerText = '0 Events';
     }
 
     function togglePauseStream() {
       isPaused = !isPaused;
       const btn = document.getElementById('pause-btn');
+      if (!btn) return;
       if (isPaused) {
         btn.innerHTML = '<i class="fa-solid fa-play text-[10px]"></i> Resume';
         btn.classList.add('bg-crimson-dim', 'text-crimson');
@@ -737,12 +732,19 @@
       }
     }
 
-    // WebSocket Connection Manager with Fallback Stream Generator
-    let ws;
-    function connectWS() {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws/security-stream`;
+    // WebSocket Connection Manager with Live Gateway Telemetry + Fallback
+    let ws = null;
+    let reconnectInterval = null;
+    let pingInterval = null;
+    let lastPingTime = 0;
+    let simulationTimer = null;
 
+    function connectWS() {
+      const isFile = window.location.protocol === 'file:';
+      const protocol = (window.location.protocol === 'https:') ? 'wss:' : 'ws:';
+      const host = (!isFile && window.location.host) ? window.location.host : '127.0.0.1:8000';
+      const wsUrl = `${protocol}//${host}/ws/security-stream`;
+      
       const statusText = document.getElementById('ws-status');
       const statusPulse = document.getElementById('ws-pulse');
 
@@ -750,15 +752,45 @@
         ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
-          statusText.innerText = 'LIVE GATEWAY';
-          statusText.className = 'text-emerald-400 font-bold';
-          statusPulse.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-ping';
+          if (statusText) {
+            statusText.innerText = 'LIVE GATEWAY';
+            statusText.className = 'text-emerald-400 font-bold';
+          }
+          if (statusPulse) {
+            statusPulse.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-ping';
+          }
+          stopSimulation();
+
+          // Heartbeat ping every 4 seconds to track live latency
+          if (pingInterval) clearInterval(pingInterval);
+          pingInterval = setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              lastPingTime = performance.now();
+              ws.send('ping');
+            }
+          }, 4000);
         };
 
         ws.onmessage = (msg) => {
+          if (msg.data === 'pong') {
+            const rtt = Math.max(0.4, performance.now() - lastPingTime);
+            const pingEl = document.getElementById('ping-ms');
+            const kpiLatEl = document.getElementById('kpi-latency');
+            const rttStr = rtt.toFixed(1) + 'ms';
+            if (pingEl) pingEl.innerText = rttStr;
+            if (kpiLatEl) kpiLatEl.innerText = rttStr;
+            return;
+          }
+
           try {
             const data = JSON.parse(msg.data);
-            if (data.type !== 'HANDSHAKE') {
+            if (data.type === 'HANDSHAKE') {
+              if (data.stats) {
+                if (data.stats.total_screened > screenedCount) screenedCount = data.stats.total_screened;
+                if (data.stats.total_blocked > blockedCount) blockedCount = data.stats.total_blocked;
+                updateKPIs();
+              }
+            } else {
               addThreatRow(data);
             }
           } catch (e) {
@@ -767,29 +799,52 @@
         };
 
         ws.onerror = () => triggerSimulatedMode();
-        ws.onclose = () => triggerSimulatedMode();
-      } catch (e) {
+        ws.onclose = () => {
+          if (pingInterval) clearInterval(pingInterval);
+          triggerSimulatedMode();
+          scheduleReconnect();
+        };
+      } catch(e) {
         triggerSimulatedMode();
+        scheduleReconnect();
       }
     }
 
-    let isSimulating = false;
-    function triggerSimulatedMode() {
-      if (isSimulating) return;
-      isSimulating = true;
+    function scheduleReconnect() {
+      if (reconnectInterval) return;
+      reconnectInterval = setInterval(() => {
+        if (!ws || ws.readyState === WebSocket.CLOSED) {
+          connectWS();
+        }
+      }, 5000);
+    }
 
+    function stopSimulation() {
+      if (simulationTimer) {
+        clearInterval(simulationTimer);
+        simulationTimer = null;
+      }
+    }
+
+    function triggerSimulatedMode() {
       const statusText = document.getElementById('ws-status');
       const statusPulse = document.getElementById('ws-pulse');
 
-      statusText.innerText = 'SIMULATED STREAM';
-      statusText.className = 'text-crimson font-bold';
-      statusPulse.className = 'w-2 h-2 rounded-full bg-crimson animate-ping';
+      if (statusText) {
+        statusText.innerText = 'SIMULATED STREAM';
+        statusText.className = 'text-crimson font-bold';
+      }
+      if (statusPulse) {
+        statusPulse.className = 'w-2 h-2 rounded-full bg-crimson animate-ping';
+      }
 
-      setInterval(() => {
-        if (Math.random() > 0.3) {
-          generateSimulatedEvent();
-        }
-      }, 1400);
+      if (!simulationTimer) {
+        simulationTimer = setInterval(() => {
+          if (Math.random() > 0.35) {
+            generateSimulatedEvent();
+          }
+        }, 1500);
+      }
     }
 
     const sampleEndpoints = ['/api/v1/auth/token', '/api/v1/users/1094', '/api/v2/payment/charge', '/api/v1/admin/config', '/graphql'];
@@ -812,26 +867,54 @@
         timestamp: new Date().toISOString(),
         event_type: type,
         user_id: 'usr_' + Math.floor(1000 + Math.random() * 9000),
-        ip: sampleIPs[Math.floor(Math.random() * sampleIPs.length)],
+        client_ip: sampleIPs[Math.floor(Math.random() * sampleIPs.length)],
         endpoint: sampleEndpoints[Math.floor(Math.random() * sampleEndpoints.length)],
         risk_score: parseFloat(riskScore),
         action: isBlocked ? (Math.random() > 0.85 ? 'TARPIT' : 'BLOCKED') : 'ALLOW',
-        bot_signature: sampleBots[Math.floor(Math.random() * sampleBots.length)]
+        bot_signature: sampleBots[Math.floor(Math.random() * sampleBots.length)],
+        latency_ms: (Math.random() * 2 + 0.8).toFixed(2)
       };
 
       addThreatRow(event);
     }
 
-    function injectSampleThreat() {
+    async function injectSampleThreat() {
+      // If connected to live gateway, trigger an actual attack vector via HTTP!
+      const isFile = window.location.protocol === 'file:';
+      const host = (!isFile && window.location.host) ? window.location.host : '127.0.0.1:8000';
+      const protocol = (window.location.protocol === 'https:') ? 'https:' : 'http:';
+      const targetUrl = `${protocol}//${host}/api/v1/orders/1001`;
+
+      // 'alg: none' Exploit Token payload
+      const noneToken = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJhdHRhY2tlcl93cyIsInJvbGUiOiJhZG1pbiJ9.";
+      
+      try {
+        const resp = await fetch(targetUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${noneToken}`
+          }
+        });
+        if (resp.status === 403) {
+          // Attack vector intercepted by live gateway!
+          // The gateway will broadcast the ALG_NONE_EXPLOIT over WebSocket in real time.
+          return;
+        }
+      } catch (err) {
+        // Fallback to local injection if gateway is offline/standalone
+      }
+
       const event = {
         timestamp: new Date().toISOString(),
         event_type: 'ALG_NONE_EXPLOIT',
         user_id: 'attacker_root',
-        ip: '185.220.101.66',
+        client_ip: '185.220.101.66',
         endpoint: '/api/v1/admin/privileges',
         risk_score: 0.99,
         action: 'BLOCKED',
-        bot_signature: 'HeadlessChrome/118 Exploit Script'
+        bot_signature: 'HeadlessChrome/118 Exploit Script',
+        threat_indicators: ['SIGNATURE_EVASION_ATTACK'],
+        latency_ms: 0.85
       };
       addThreatRow(event);
     }
@@ -839,12 +922,11 @@
     // Initialize Dashboard
     window.onload = () => {
       connectWS();
-      // Populate seed items immediately
+      // Populate initial seed items immediately
       for (let i = 0; i < 8; i++) {
         generateSimulatedEvent();
       }
     };
   </script>
 </body>
-
 </html>

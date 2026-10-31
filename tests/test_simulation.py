@@ -10,6 +10,9 @@ from simulate_attacks import (
     run_scenario_2_alg_none,
     run_scenario_3_rate_limit,
     run_scenario_4_bola_attack,
+    run_scenario_5_param_fuzzing,
+    run_scenario_6_expired_token,
+    run_scenario_7_missing_token,
 )
 from benchmark import run_benchmark
 
@@ -67,9 +70,35 @@ async def test_simulation_scenario_4_bola_attack():
 
 
 @pytest.mark.asyncio
+async def test_simulation_scenario_5_param_fuzzing():
+    """Scenario 5: High-entropy SQLi / parameter fuzzing payload is blocked (HTTP 403)."""
+    async with get_sim_client() as client:
+        passed = await run_scenario_5_param_fuzzing(client)
+        assert passed is True
+
+
+@pytest.mark.asyncio
+async def test_simulation_scenario_6_expired_token():
+    """Scenario 6: Expired JWT replay attempt is trapped by cryptographic guard (HTTP 401)."""
+    async with get_sim_client() as client:
+        passed = await run_scenario_6_expired_token(client)
+        assert passed is True
+
+
+@pytest.mark.asyncio
+async def test_simulation_scenario_7_missing_token():
+    """Scenario 7: Zero-trust perimeter drops unauthenticated request (HTTP 401)."""
+    async with get_sim_client() as client:
+        passed = await run_scenario_7_missing_token(client)
+        assert passed is True
+
+
+@pytest.mark.asyncio
 async def test_benchmark_execution_and_sla():
     """Benchmark: 30 requests verify throughput, latency calculation, and sub-15ms SLA target."""
-    report = await run_benchmark(n_requests=30, concurrency=1)
+    import asyncio
+    await asyncio.sleep(0.5)
+    report = await run_benchmark(n_requests=30, concurrency=1, force_in_process=True)
     assert report["successful_requests"] == 30
     assert report["throughput_rps"] > 0
     assert "p95" in report["latency_percentiles_ms"]

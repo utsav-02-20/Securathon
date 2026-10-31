@@ -1,0 +1,24 @@
+{
+  "name": "securathon-soc-dashboard",
+  "version": "1.0.0",
+  "description": "Securathon Intelligent API Security Gateway - Real-time SOC Observability Dashboard",
+  "private": true,
+  "scripts": {
+    "start": "python3 -m http.server 3000 -d src",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "soc",
+    "dashboard",
+    "security",
+    "api-gateway",
+    "observability"
+  ],
+  "author": "Securathon Team",
+  "license": "MIT",
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}

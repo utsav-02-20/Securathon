@@ -25,6 +25,15 @@ async def get_authenticated_claims(request: Request) -> Dict[str, Any]:
     client_ip = request.client.host if request.client else "127.0.0.1"
     auth_header = request.headers.get("Authorization")
     if not auth_header:
+        if not settings.require_auth:
+            anon_id = f"ip_{client_ip.replace('.', '_').replace(':', '_')}"
+            return {
+                "sub": anon_id,
+                "role": "unauthenticated",
+                "tenant_id": "public",
+                "jti": f"anon_{anon_id}",
+                "is_unauthenticated": True
+            }
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
@@ -33,6 +42,7 @@ async def get_authenticated_claims(request: Request) -> Dict[str, Any]:
             },
             headers={"WWW-Authenticate": "Bearer"}
         )
+
 
     parts = auth_header.split()
     if len(parts) != 2 or parts[0].lower() != "bearer":
@@ -138,21 +148,32 @@ async def enforce_sliding_window_rate_limit(
     role = str(claims.get("role", "customer")).lower()
     client_ip = request.client.host if request.client else "127.0.0.1"
 
-    # Determine role-based quota
-    if role == "admin":
+    # Determine quota and scope
+    if claims.get("is_unauthenticated"):
+        limit = settings.rate_limit_unauth_ip
+        scope = "ip"
+        identifier = client_ip
+    elif role == "admin":
         limit = settings.rate_limit_admin
+        scope = "user"
+        identifier = user_id
     elif role == "merchant":
         limit = settings.rate_limit_merchant
+        scope = "user"
+        identifier = user_id
     else:
         limit = settings.rate_limit_customer
+        scope = "user"
+        identifier = user_id
 
     # Check sliding window rate limit atomically in Redis
     result: RateLimitResult = await rate_limiter.is_allowed(
-        identifier=user_id,
+        identifier=identifier,
         limit=limit,
         window_seconds=settings.rate_limit_window_seconds,
-        scope="user"
+        scope=scope
     )
+
 
     request.state.rate_limit_result = result
 
