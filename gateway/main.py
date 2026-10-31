@@ -8,7 +8,7 @@ from datetime import timedelta
 
 import uvicorn
 from fastapi import FastAPI, Request, Response, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -121,6 +121,17 @@ async def gateway_health():
     }
 
 
+@app.get("/", include_in_schema=False)
+async def root_redirect():
+    """Redirect root path to interactive SOC Dashboard."""
+    return RedirectResponse(url="/dashboard", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @app.get("/dashboard", response_class=HTMLResponse, tags=["Observability"])
 async def get_dashboard():
     """
@@ -210,35 +221,6 @@ async def revoke_token(payload: RevokeRequest):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Must provide either 'token' or 'jti' to revoke."
         )
-
-
-@app.get("/auth/demo-tokens", tags=["Authentication"])
-async def get_demo_tokens():
-    """
-    Utility endpoint for live demonstrations & tests.
-    Returns pre-generated valid tokens for all persona profiles.
-    """
-    personas = [
-        {"user_id": "user_101", "role": "customer", "tenant_id": "tenant_alpha", "name": "Alice (Alpha Corp)"},
-        {"user_id": "user_102", "role": "customer", "tenant_id": "tenant_beta", "name": "Bob (Beta Logistics)"},
-        {"user_id": "user_104", "role": "customer", "tenant_id": "tenant_gamma", "name": "Eve (Attacker)"},
-        {"user_id": "user_999", "role": "admin", "tenant_id": "system", "name": "System Admin"},
-    ]
-    tokens = {}
-    for p in personas:
-        jti = str(uuid.uuid4())
-        token = create_access_token({
-            "sub": p["user_id"],
-            "role": p["role"],
-            "tenant_id": p["tenant_id"],
-            "jti": jti
-        })
-        tokens[p["user_id"]] = {
-            "name": p["name"],
-            "token": token,
-            "jti": jti
-        }
-    return tokens
 
 
 @app.get("/auth/rate-limit-status", tags=["Rate Limiting"])
@@ -415,6 +397,7 @@ async def proxy_protected_api(
     }
 
     downstream_url = f"{settings.backend_service_url}/api/{path}"
+    proxy_overhead_ms = round((time.perf_counter() - t_start) * 1000, 2)
     downstream_response = await forward_request(request, downstream_url, injected_headers)
 
     total_latency_ms = round((time.perf_counter() - t_start) * 1000, 2)
@@ -424,7 +407,7 @@ async def proxy_protected_api(
         user_id=user_id,
         endpoint=endpoint_path,
         risk_score=eval_result.risk_score,
-        latency_ms=total_latency_ms,
+        latency_ms=proxy_overhead_ms,
         status_code=downstream_response.status_code
     )
 
@@ -437,9 +420,9 @@ async def proxy_protected_api(
         http_method=request.method,
         risk_score=eval_result.risk_score,
         action="ALLOW",
-        latency_ms=total_latency_ms
+        latency_ms=proxy_overhead_ms
     )
-    await event_broadcaster.broadcast(allow_event)
+    asyncio.create_task(event_broadcaster.broadcast(allow_event))
 
     # Attach Rate Limit & AI Headers to Client Response
     rate_limit_result: Optional[RateLimitResult] = getattr(request.state, "rate_limit_result", None)
@@ -450,7 +433,8 @@ async def proxy_protected_api(
     downstream_response.headers["X-Gateway-Risk-Score"] = str(eval_result.risk_score)
     downstream_response.headers["X-Gateway-Anomaly"] = str(eval_result.is_anomaly).lower()
     downstream_response.headers["X-Gateway-Action"] = decision.action
-    downstream_response.headers["X-Gateway-Latency-Ms"] = str(total_latency_ms)
+    downstream_response.headers["X-Gateway-Latency-Ms"] = str(proxy_overhead_ms)
+    downstream_response.headers["X-Gateway-Total-Latency-Ms"] = str(total_latency_ms)
     downstream_response.headers["X-Gateway-AI-Latency-Ms"] = str(eval_result.inference_latency_ms)
 
     return downstream_response

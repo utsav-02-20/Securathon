@@ -56,10 +56,56 @@ async def get_test_client() -> Tuple[httpx.AsyncClient, str]:
     return client, mode
 
 
+from mock_backend.seed_data import USERS_DB, ORDERS_DB
+from mock_backend.models import User, Order, OrderItem
+
+
+async def ensure_simulation_data(client: httpx.AsyncClient):
+    """
+    Dynamically creates initial orders via memory/POST for the simulation run.
+    Ensures zero static pre-seeded or mock data is required at server startup.
+    """
+    if "user_101" not in USERS_DB:
+        USERS_DB["user_101"] = User(
+            id="user_101",
+            tenant_id="tenant_alpha",
+            username="alice",
+            email="alice@alpha-corp.com",
+            full_name="Alice Smith",
+            role="customer",
+            is_active=True,
+            created_at="2026-01-15T09:00:00Z"
+        )
+    if "1001" not in ORDERS_DB:
+        for i in range(4):
+            oid = str(1001 + i)
+            ORDERS_DB[oid] = Order(
+                id=oid,
+                user_id="user_101",
+                tenant_id="tenant_alpha",
+                items=[OrderItem(product_id=f"prod_{i+1}", name=f"Enterprise Item {i+1}", quantity=1, unit_price=100.0)],
+                total_amount=100.0,
+                status="confirmed",
+                shipping_address="Enterprise Parkway, Silicon Valley",
+                created_at="2026-01-15T10:00:00Z"
+            )
+    token = create_access_token({"sub": "setup_admin", "role": "admin"})
+    headers = {"Authorization": f"Bearer {token}"}
+    check = await client.get("/api/v1/orders/1001", headers=headers)
+    if check.status_code == 404:
+        for i in range(4):
+            order_payload = {
+                "items": [{"product_id": f"prod_{i+1}", "name": f"Enterprise Item {i+1}", "quantity": 1, "unit_price": 100.0}],
+                "shipping_address": "Enterprise Parkway, Silicon Valley"
+            }
+            await client.post("/api/v1/orders", json=order_payload, headers=headers)
+
+
 async def run_scenario_1_normal_user(client: httpx.AsyncClient) -> bool:
     print(f"\n{BOLD}{CYAN}--- [SCENARIO 1] Normal Human Browsing (Alice) ---{RESET}")
     print("Action: Alice uses valid JWT to view her order (1001), refresh, and view order list.")
     
+    await ensure_simulation_data(client)
     alice_id = f"alice_{int(time.time() * 1000)}"
     token = create_access_token({"sub": alice_id, "role": "customer", "tenant_id": "tenant_alpha"})
     headers = {"Authorization": f"Bearer {token}"}
@@ -172,6 +218,7 @@ async def main():
 
     client, mode = await get_test_client()
     print(f"Execution Mode: {BOLD}{mode}{RESET}")
+    await ensure_simulation_data(client)
 
     results = []
     results.append(("Normal Human Browsing", await run_scenario_1_normal_user(client)))

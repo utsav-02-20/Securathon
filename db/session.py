@@ -60,23 +60,44 @@ async def init_db() -> AsyncEngine:
     is_sqlite = db_url.startswith("sqlite")
     connect_args = {"check_same_thread": False} if is_sqlite else {}
 
-    _engine = create_async_engine(
-        db_url,
-        echo=False,
-        future=True,
-        connect_args=connect_args
-    )
-
-    _session_factory = async_sessionmaker(
-        bind=_engine,
-        class_=AsyncSession,
-        expire_on_commit=False
-    )
-
-    # Automatically create tables if they do not exist
-    async with _engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        engine = create_async_engine(
+            db_url,
+            echo=False,
+            future=True,
+            connect_args=connect_args
+        )
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        _engine = engine
+        _session_factory = async_sessionmaker(
+            bind=_engine,
+            class_=AsyncSession,
+            expire_on_commit=False
+        )
         logger.info("Forensic database tables verified / initialized successfully.")
+        return _engine
+    except Exception as e:
+        if not is_sqlite:
+            logger.warning(f"PostgreSQL connection failed ({e}). Falling back to SQLite...")
+            sqlite_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "securathon_audit.db")
+            sqlite_url = f"sqlite+aiosqlite:///{sqlite_path}"
+            _engine = create_async_engine(
+                sqlite_url,
+                echo=False,
+                future=True,
+                connect_args={"check_same_thread": False}
+            )
+            _session_factory = async_sessionmaker(
+                bind=_engine,
+                class_=AsyncSession,
+                expire_on_commit=False
+            )
+            async with _engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            logger.info("Forensic database tables initialized on SQLite fallback.")
+            return _engine
+        raise
 
     return _engine
 

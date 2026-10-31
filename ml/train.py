@@ -3,14 +3,14 @@ import joblib
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import IsolationForest
-from typing import Tuple
+from typing import Tuple, Optional
 from core.logger import setup_logger
-from data.generate_dataset import DATASET_PATH, generate_and_save_dataset
 
 logger = setup_logger("ml.train")
 
 MODEL_DIR = os.path.join(os.path.dirname(__file__), "models")
 MODEL_PATH = os.path.join(MODEL_DIR, "isolation_forest.joblib")
+DATASET_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "telemetry_dataset.csv")
 
 FEATURE_COLUMNS = [
     "request_velocity",
@@ -23,11 +23,10 @@ FEATURE_COLUMNS = [
 
 def load_dataset(csv_path: str = DATASET_PATH) -> Tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """
-    Loads behavioral telemetry dataset from persistent CSV file.
+    Loads behavioral telemetry dataset from CSV file if present.
     """
     if not os.path.exists(csv_path):
-        logger.info(f"Dataset not found at {csv_path}. Generating dataset...")
-        generate_and_save_dataset(csv_path)
+        raise FileNotFoundError(f"Telemetry dataset not found at {csv_path}.")
 
     df = pd.read_csv(csv_path)
     X = df[FEATURE_COLUMNS].values
@@ -65,7 +64,9 @@ def get_trained_model() -> IsolationForest:
     """Loads or trains model."""
     if os.path.exists(MODEL_PATH):
         try:
-            return joblib.load(MODEL_PATH)
+            model = joblib.load(MODEL_PATH)
+            model.n_jobs = 1
+            return model
         except Exception as e:
             logger.warning(f"Error loading model ({e}). Re-training...")
             return train_and_save_model()

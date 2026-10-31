@@ -63,16 +63,16 @@ def test_issue_token(gateway_client: TestClient):
     assert data["expires_in"] == 1800
 
 
-def test_demo_tokens_endpoint(gateway_client: TestClient):
-    """Verify /auth/demo-tokens returns ready-to-use tokens for demo personas."""
-    resp = gateway_client.get("/auth/demo-tokens")
-    assert resp.status_code == 200
-    data = resp.json()
-    assert "user_101" in data
-    assert "user_102" in data
-    assert "user_104" in data
-    assert "user_999" in data
-    assert "token" in data["user_101"]
+def test_multi_role_tokens_issuance(gateway_client: TestClient):
+    """Verify /auth/token endpoint issues valid tokens for different roles dynamically."""
+    roles = ["customer", "merchant", "admin"]
+    for role in roles:
+        resp = gateway_client.post("/auth/token", json={"user_id": f"test_{role}", "role": role})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["role"] == role
+        assert "access_token" in data
+        assert "jti" in data
 
 
 def test_missing_token_blocked_401(gateway_client: TestClient):
